@@ -16,6 +16,7 @@ import {
   setTenantStripeChargesEnabled,
   clientExists,
   getVariantForBooking,
+  payOrderWithGiftCard,
 } from "@prodigy/db";
 import type { LineKind, PaymentMethod } from "@prodigy/contracts";
 import { ValidationError, reqString, optString, reqInt, optBool, wrap } from "./http";
@@ -40,7 +41,7 @@ export function registerPaymentRoutes(api: Router): void {
       const billing = await getTenantBilling(tid);
       const platform = isStripePlatformConfigured();
       const connected = platform && !!billing.stripeAccountId && billing.stripeChargesEnabled;
-      const methods: PaymentMethod[] = ["cash", "external_card", "other"];
+      const methods: PaymentMethod[] = ["cash", "external_card", "gift_card", "other"];
       if (connected) methods.push("stripe_card");
       res.json({
         stripePlatformConfigured: platform,
@@ -240,9 +241,17 @@ export function registerPaymentRoutes(api: Router): void {
       const tid = userOf(req).tenantId;
       const body = (req.body ?? {}) as Record<string, unknown>;
       const method = optString(body.method) as PaymentMethod | undefined;
-      if (!method || !["cash", "external_card", "stripe_card", "other"].includes(method))
+      if (!method || !["cash", "external_card", "stripe_card", "gift_card", "other"].includes(method))
         throw new ValidationError("Choose a payment method.");
       const amountCents = reqInt(body.amountCents, "amountCents", 1);
+
+      if (method === "gift_card") {
+        const code = optString(body.code);
+        if (!code) throw new ValidationError("Enter the gift card code.");
+        const { order } = await payOrderWithGiftCard(tid, req.params.id, code, amountCents);
+        res.status(201).json({ order });
+        return;
+      }
 
       if (method === "stripe_card") {
         const billing = await getTenantBilling(tid);

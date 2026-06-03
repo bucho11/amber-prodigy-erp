@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   Appointment,
   Catalog,
+  GiftCard,
+  GiftCardTxn,
   Order,
   OrderListItem,
   PaymentMethod,
@@ -19,16 +21,20 @@ const METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: "Cash",
   external_card: "Card (external)",
   stripe_card: "Card (Stripe)",
+  gift_card: "Gift card",
   other: "Other",
 };
+
+type CTab = "sale" | "recent" | "giftcards" | "setup";
 
 export function CheckoutPage() {
   const { hasPermission } = useAuth();
   const canOperate = hasPermission("pos.operate");
   const canHistory = hasPermission("financials.view");
   const canSetup = hasPermission("settings.manage");
-  const first = canOperate ? "sale" : canHistory ? "recent" : "setup";
-  const [tab, setTab] = useState<"sale" | "recent" | "setup">(first as "sale" | "recent" | "setup");
+  const canGiftCards = hasPermission("sales.manage");
+  const first: CTab = canOperate ? "sale" : canHistory ? "recent" : canGiftCards ? "giftcards" : "setup";
+  const [tab, setTab] = useState<CTab>(first);
   const [config, setConfig] = useState<PaymentsConfig | null>(null);
 
   const loadConfig = async () => {
@@ -61,6 +67,11 @@ export function CheckoutPage() {
             Recent sales
           </button>
         )}
+        {canGiftCards && (
+          <button className={tab === "giftcards" ? "subtab active" : "subtab"} onClick={() => setTab("giftcards")}>
+            Gift cards
+          </button>
+        )}
         {canSetup && (
           <button className={tab === "setup" ? "subtab active" : "subtab"} onClick={() => setTab("setup")}>
             Payments setup
@@ -70,6 +81,7 @@ export function CheckoutPage() {
 
       {tab === "sale" && canOperate && <SaleView config={config} />}
       {tab === "recent" && canHistory && <RecentView canOperate={canOperate} />}
+      {tab === "giftcards" && canGiftCards && <GiftCardsView />}
       {tab === "setup" && canSetup && <SetupView config={config} onChanged={loadConfig} />}
     </>
   );
@@ -151,6 +163,7 @@ function Ticket({
   const [tip, setTip] = useState((order.tipCents / 100).toString());
   const [payMethod, setPayMethod] = useState<PaymentMethod>("cash");
   const [payAmount, setPayAmount] = useState((order.balanceCents / 100).toFixed(2));
+  const [giftCode, setGiftCode] = useState("");
 
   useEffect(() => {
     api<Catalog>("/catalog").then(setCatalog).catch(() => {});
@@ -230,11 +243,14 @@ function Ticket({
   const takePayment = () => {
     const amount = dollarsToCents(payAmount);
     if (amount <= 0) return setErr("Enter a payment amount.");
-    void call(api<{ order: Order }>(`/orders/${order.id}/payments`, "POST", { method: payMethod, amountCents: amount }));
+    if (payMethod === "gift_card" && !giftCode.trim()) return setErr("Enter the gift card code.");
+    const body: Record<string, unknown> = { method: payMethod, amountCents: amount };
+    if (payMethod === "gift_card") body.code = giftCode.trim();
+    void call(api<{ order: Order }>(`/orders/${order.id}/payments`, "POST", body));
   };
 
   const stripeConnected = config?.stripeConnected ?? false;
-  const methods: PaymentMethod[] = ["cash", "external_card", "stripe_card", "other"];
+  const methods: PaymentMethod[] = ["cash", "external_card", "stripe_card", "gift_card", "other"];
 
   return (
     <section className="card">
@@ -372,6 +388,15 @@ function Ticket({
             );
           })}
         </div>
+        {payMethod === "gift_card" && (
+          <input
+            className="input"
+            placeholder="Gift card code"
+            value={giftCode}
+            onChange={(e) => setGiftCode(e.target.value)}
+            style={{ marginBottom: 8, fontFamily: "monospace" }}
+          />
+        )}
         <div className="form-row">
           <span className="dollar big">$</span>
           <input className="input" value={payAmount} inputMode="decimal" onChange={(e) => setPayAmount(e.target.value)} style={{ width: 120 }} />
@@ -635,6 +660,176 @@ function SetupView({ config, onChanged }: { config: PaymentsConfig | null; onCha
           </>
         )}
         {stripeMsg && <p className="muted small">{stripeMsg}</p>}
+      </section>
+    </>
+  );
+}
+
+function GiftCardsView() {
+  const [cards, setCards] = useState<GiftCard[] | null>(null);
+  const [detail, setDetail] = useState<{ card: GiftCard; txns: GiftCardTxn[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [amount, setAmount] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [note, setNote] = useState("");
+  const [issuing, setIssuing] = useState(false);
+
+  const load = async () => {
+    try {
+      const r = await api<{ giftCards: GiftCard[] }>("/gift-cards");
+      setCards(r.giftCards);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const issue = async () => {
+    const cents = dollarsToCents(amount);
+    if (cents <= 0) return setError("Enter an amount.");
+    setIssuing(true);
+    setError(null);
+    try {
+      await api("/gift-cards", "POST", { amountCents: cents, clientId: clientId || null, note: note.trim() || null });
+      setAmount("");
+      setClientId("");
+      setClientName("");
+      setNote("");
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  const open = async (id: string) => {
+    try {
+      const r = await api<{ giftCard: GiftCard; transactions: GiftCardTxn[] }>(`/gift-cards/${id}`);
+      setDetail({ card: r.giftCard, txns: r.transactions });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const voidCard = async () => {
+    if (!detail) return;
+    try {
+      const r = await api<{ giftCard: GiftCard }>(`/gift-cards/${detail.card.id}/void`, "POST");
+      setDetail({ ...detail, card: r.giftCard });
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  if (detail) {
+    return (
+      <section className="card">
+        <button className="link-btn" onClick={() => setDetail(null)}>
+          ‹ Back to gift cards
+        </button>
+        <div className="ticket-head">
+          <h2 style={{ fontFamily: "monospace" }}>{detail.card.code}</h2>
+          <span className={`status-badge s-${detail.card.status === "active" ? "completed" : "cancelled"}`}>{detail.card.status}</span>
+        </div>
+        <div className="totals" style={{ borderTop: "none", paddingTop: 0 }}>
+          <div className="totline grand">
+            <span>Balance</span>
+            <span>{fmt(detail.card.balanceCents)}</span>
+          </div>
+          <div className="totline">
+            <span className="muted small">Originally</span>
+            <span>{fmt(detail.card.initialCents)}</span>
+          </div>
+          {detail.card.clientName && (
+            <div className="totline">
+              <span className="muted small">Client</span>
+              <span>{detail.card.clientName}</span>
+            </div>
+          )}
+          {detail.card.note && (
+            <div className="totline">
+              <span className="muted small">Note</span>
+              <span>{detail.card.note}</span>
+            </div>
+          )}
+        </div>
+        <div className="pay-list">
+          {detail.txns.map((t) => (
+            <div key={t.id} className="totline">
+              <span className="muted small">
+                {t.kind}
+                {t.createdAt ? ` · ${new Date(t.createdAt).toLocaleDateString()}` : ""}
+              </span>
+              <span>
+                {t.amountCents >= 0 ? "+" : ""}
+                {fmt(t.amountCents)}
+              </span>
+            </div>
+          ))}
+        </div>
+        {error && <p className="bad small">{error}</p>}
+        {detail.card.status === "active" && (
+          <div className="editor-actions">
+            <button className="btn" onClick={() => void voidCard()}>
+              Void card
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <>
+      <section className="card">
+        <h2>Issue a gift card</h2>
+        <div className="form-row">
+          <label className="field" style={{ maxWidth: 150 }}>
+            <span>Amount</span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span className="dollar">$</span>
+              <input className="input" value={amount} inputMode="decimal" onChange={(e) => setAmount(e.target.value)} />
+            </div>
+          </label>
+          <label className="field" style={{ flex: 1 }}>
+            <span>Client (optional)</span>
+            <ClientPicker value={clientId} displayName={clientName} onPick={(id, n) => { setClientId(id); setClientName(n); }} />
+          </label>
+        </div>
+        <input className="input" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+        {error && <p className="bad small">{error}</p>}
+        <div className="editor-actions">
+          <button className="btn primary" disabled={issuing} onClick={() => void issue()}>
+            {issuing ? "Issuing\u2026" : "Issue gift card"}
+          </button>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Gift cards</h2>
+        {!cards && <p className="muted">Loading&hellip;</p>}
+        {cards && cards.length === 0 && <p className="muted small">No gift cards yet.</p>}
+        <ul className="plain-list">
+          {cards?.map((c) => (
+            <li key={c.id} className="list-row clickable" onClick={() => void open(c.id)}>
+              <div>
+                <div className="list-title" style={{ fontFamily: "monospace" }}>
+                  {c.code}
+                  <span className={`status-badge s-${c.status === "active" ? "completed" : "cancelled"}`}>{c.status}</span>
+                </div>
+                <div className="muted small">
+                  {fmt(c.balanceCents)} of {fmt(c.initialCents)}
+                  {c.clientName ? ` · ${c.clientName}` : ""}
+                </div>
+              </div>
+              <span className="chev">›</span>
+            </li>
+          ))}
+        </ul>
       </section>
     </>
   );

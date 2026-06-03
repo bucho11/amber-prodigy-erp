@@ -332,7 +332,7 @@ export interface LinkableUser {
 // ---- Point of sale / payments ----
 export type OrderStatus = "open" | "paid" | "void" | "refunded";
 export type LineKind = "service" | "product" | "custom";
-export type PaymentMethod = "cash" | "external_card" | "stripe_card" | "other";
+export type PaymentMethod = "cash" | "external_card" | "stripe_card" | "gift_card" | "other";
 export type PaymentStatus = "recorded" | "pending" | "succeeded" | "failed" | "refunded";
 
 export interface OrderLineItem {
@@ -467,4 +467,26 @@ export interface DayAvailability {
   workingWindows: { start: string; end: string }[]; // HH:MM
   busy: BusyBlock[];
   openSlots: string[]; // HH:MM start times where the service fits
+}
+
+
+// ---- Gift cards ----
+export type GiftCardStatus = "active" | "void";
+export interface GiftCard {
+  id: string;
+  code: string;
+  clientId: string | null;
+  clientName: string | null;
+  initialCents: number;
+  balanceCents: number;
+  status: GiftCardStatus;
+  note: string | null;
+  createdAt: string;
+}
+export interface GiftCardTxn {
+  id: string;
+  kind: string;        // issue | redeem | void
+  amountCents: number; // signed
+  orderId: string | null;
+  createdAt: string;
 }

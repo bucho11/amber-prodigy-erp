@@ -418,6 +418,33 @@ async function applySchema(): Promise<void> {
       created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_provider_time_off ON provider_time_off(tenant_id, provider_id, start_date);
+
+    -- Gift cards (slice 11): prepaid stored value, redeemable at checkout. Money in cents.
+    CREATE TABLE IF NOT EXISTS gift_cards (
+      id            BIGSERIAL PRIMARY KEY,
+      tenant_id     BIGINT NOT NULL REFERENCES tenants(id),
+      code          TEXT NOT NULL,
+      client_id     BIGINT REFERENCES clients(id),
+      initial_cents INTEGER NOT NULL,
+      balance_cents INTEGER NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'active',
+      note          TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (tenant_id, code)
+    );
+    CREATE INDEX IF NOT EXISTS idx_gift_cards_tenant ON gift_cards(tenant_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_gift_cards_client ON gift_cards(tenant_id, client_id);
+
+    CREATE TABLE IF NOT EXISTS gift_card_txns (
+      id           BIGSERIAL PRIMARY KEY,
+      tenant_id    BIGINT NOT NULL REFERENCES tenants(id),
+      gift_card_id BIGINT NOT NULL REFERENCES gift_cards(id) ON DELETE CASCADE,
+      kind         TEXT NOT NULL,       -- issue | redeem | void
+      amount_cents INTEGER NOT NULL,    -- signed: +issue, -redeem
+      order_id     BIGINT REFERENCES orders(id),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_gift_card_txns ON gift_card_txns(tenant_id, gift_card_id);
   `);
 }
 
@@ -558,3 +585,4 @@ export * from "./staff";
 export * from "./payments";
 export * from "./clinical";
 export * from "./availability";
+export * from "./giftcards";

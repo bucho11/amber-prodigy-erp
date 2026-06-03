@@ -29,6 +29,7 @@ import { registerStaffRoutes } from "./routes-staff";
 import { registerPaymentRoutes } from "./routes-payments";
 import { registerClinicalRoutes } from "./routes-clinical";
 import { registerAvailabilityRoutes } from "./routes-availability";
+import { registerGiftCardRoutes } from "./routes-giftcards";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -96,6 +97,9 @@ registerClinicalRoutes(api);
 
 // Provider availability routes.
 registerAvailabilityRoutes(api);
+
+// Gift card routes.
+registerGiftCardRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
@@ -279,6 +283,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     }
     if (err.name === "StripeNotConfiguredError") {
       res.status(503).json({ error: err.message, comingSoon: true });
+      return;
+    }
+    if (err.name === "GiftCardError") {
+      res.status(400).json({ error: err.message });
       return;
     }
   }
