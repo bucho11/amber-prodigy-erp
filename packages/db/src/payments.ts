@@ -1,4 +1,5 @@
 import { query, withTransaction } from "./index";
+import { postOrderSettlement, reverseOrderSettlement } from "./ledger";
 import type {
   Order,
   OrderLineItem,
@@ -339,7 +340,15 @@ export async function addPayment(tenantId: string, orderId: string, input: AddPa
       await q(`UPDATE orders SET status = 'paid', closed_at = now() WHERE tenant_id = $1 AND id = $2`, [tenantId, orderId]);
     }
   });
-  return (await getOrder(tenantId, orderId))!;
+  const order = (await getOrder(tenantId, orderId))!;
+  if (order.status === "paid") {
+    try {
+      await postOrderSettlement(tenantId, order);
+    } catch (e) {
+      console.error("[ledger] settlement post failed", e);
+    }
+  }
+  return order;
 }
 
 export async function voidOrder(tenantId: string, orderId: string): Promise<Order> {
@@ -358,6 +367,11 @@ export async function voidOrder(tenantId: string, orderId: string): Promise<Orde
       }
     }
   });
+  try {
+    await reverseOrderSettlement(tenantId, orderId, "Voided");
+  } catch (e) {
+    console.error("[ledger] void reversal failed", e);
+  }
   return (await getOrder(tenantId, orderId))!;
 }
 
@@ -372,6 +386,11 @@ export async function refundOrder(tenantId: string, orderId: string): Promise<Or
     ]);
     await q(`UPDATE orders SET status = 'refunded' WHERE tenant_id = $1 AND id = $2`, [tenantId, orderId]);
   });
+  try {
+    await reverseOrderSettlement(tenantId, orderId, "Refund");
+  } catch (e) {
+    console.error("[ledger] refund reversal failed", e);
+  }
   return getOrder(tenantId, orderId);
 }
 

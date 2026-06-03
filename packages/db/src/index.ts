@@ -474,6 +474,44 @@ async function applySchema(): Promise<void> {
 
     -- Link an order line to the package credit that covered it (placed after packages exists).
     ALTER TABLE order_line_items ADD COLUMN IF NOT EXISTS package_id BIGINT REFERENCES packages(id);
+
+    -- General ledger (slice 13): chart of accounts + double-entry journal. Money in cents.
+    CREATE TABLE IF NOT EXISTS accounts (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      code        TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      type        TEXT NOT NULL,        -- asset | liability | equity | revenue | expense
+      normal_side TEXT NOT NULL,        -- debit | credit
+      is_active   BOOLEAN NOT NULL DEFAULT true,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (tenant_id, code)
+    );
+    CREATE INDEX IF NOT EXISTS idx_accounts_tenant ON accounts(tenant_id, code);
+
+    CREATE TABLE IF NOT EXISTS journal_entries (
+      id                BIGSERIAL PRIMARY KEY,
+      tenant_id         BIGINT NOT NULL REFERENCES tenants(id),
+      entry_date        DATE NOT NULL,
+      memo              TEXT,
+      source_type       TEXT,           -- order | gift_card | package | manual
+      source_id         BIGINT,
+      reverses_entry_id BIGINT REFERENCES journal_entries(id),
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_journal_entries ON journal_entries(tenant_id, entry_date DESC);
+    CREATE INDEX IF NOT EXISTS idx_journal_entries_src ON journal_entries(tenant_id, source_type, source_id);
+
+    CREATE TABLE IF NOT EXISTS journal_lines (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      entry_id    BIGINT NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+      account_id  BIGINT NOT NULL REFERENCES accounts(id),
+      debit_cents  INTEGER NOT NULL DEFAULT 0,
+      credit_cents INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_journal_lines_entry ON journal_lines(tenant_id, entry_id);
+    CREATE INDEX IF NOT EXISTS idx_journal_lines_account ON journal_lines(tenant_id, account_id);
   `);
 }
 
@@ -571,6 +609,32 @@ async function seedTenantOne(): Promise<void> {
        )`,
     [tenantId]
   );
+
+  // Standard chart of accounts (idempotent).
+  await pool.query(
+    `INSERT INTO accounts (tenant_id, code, name, type, normal_side)
+     SELECT $1::bigint, a.code, a.name, a.type, a.side
+     FROM (VALUES
+       ('1010', 'Cash', 'asset', 'debit'),
+       ('1200', 'Accounts Receivable', 'asset', 'debit'),
+       ('1500', 'Inventory', 'asset', 'debit'),
+       ('2100', 'Sales Tax Payable', 'liability', 'credit'),
+       ('2150', 'Gratuities Payable', 'liability', 'credit'),
+       ('2200', 'Gift Card Liability', 'liability', 'credit'),
+       ('2300', 'Unearned Package Revenue', 'liability', 'credit'),
+       ('3000', 'Owner''s Equity', 'equity', 'credit'),
+       ('3900', 'Retained Earnings', 'equity', 'credit'),
+       ('4000', 'Sales Revenue', 'revenue', 'credit'),
+       ('4900', 'Other Income', 'revenue', 'credit'),
+       ('5000', 'Cost of Goods Sold', 'expense', 'debit'),
+       ('6000', 'Operating Expenses', 'expense', 'debit'),
+       ('6100', 'Merchant Fees', 'expense', 'debit'),
+       ('6200', 'Rent & Facilities', 'expense', 'debit'),
+       ('6300', 'Payroll Expense', 'expense', 'debit')
+     ) AS a(code, name, type, side)
+     ON CONFLICT (tenant_id, code) DO NOTHING`,
+    [tenantId]
+  );
 }
 
 /** Run at boot. Never fatal: the app must boot even with no database. */
@@ -616,3 +680,4 @@ export * from "./clinical";
 export * from "./availability";
 export * from "./giftcards";
 export * from "./packages";
+export * from "./ledger";

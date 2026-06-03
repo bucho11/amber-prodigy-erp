@@ -1,5 +1,6 @@
 import { query, withTransaction } from "./index";
 import { getOrder, OrderNotFoundError, OrderClosedError } from "./payments";
+import { postGiftCardIssued, postOrderSettlement } from "./ledger";
 import type { GiftCard, GiftCardTxn, Order } from "@prodigy/contracts";
 
 const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -81,6 +82,11 @@ export async function issueGiftCard(
   });
   const card = await getGiftCard(tenantId, id);
   if (!card) throw new Error("failed to load issued gift card");
+  try {
+    await postGiftCardIssued(tenantId, { id: card.id, code: card.code, initialCents: card.initialCents });
+  } catch (e) {
+    console.error("[ledger] gift card post failed", e);
+  }
   return card;
 }
 
@@ -179,5 +185,12 @@ export async function payOrderWithGiftCard(
   const order = await getOrder(tenantId, orderId);
   const giftCard = await getGiftCardByCode(tenantId, code);
   if (!order || !giftCard) throw new Error("failed to load order/gift card after redemption");
+  if (order.status === "paid") {
+    try {
+      await postOrderSettlement(tenantId, order);
+    } catch (e) {
+      console.error("[ledger] gift settlement post failed", e);
+    }
+  }
   return { order, giftCard };
 }

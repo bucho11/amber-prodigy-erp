@@ -1,5 +1,6 @@
 import { query, withTransaction } from "./index";
 import { getOrder, OrderNotFoundError, OrderClosedError } from "./payments";
+import { postPackageSold } from "./ledger";
 import type { ServicePackage, PackageTxn, Order } from "@prodigy/contracts";
 
 const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -69,6 +70,11 @@ export async function sellPackage(
   });
   const pkg = await getPackage(tenantId, id);
   if (!pkg) throw new Error("failed to load sold package");
+  try {
+    await postPackageSold(tenantId, { id: pkg.id, priceCents: pkg.priceCents, serviceName: pkg.serviceName });
+  } catch (e) {
+    console.error("[ledger] package post failed", e);
+  }
   return pkg;
 }
 

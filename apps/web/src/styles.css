@@ -244,3 +244,11 @@ textarea.input { resize: vertical; min-height: 52px; font: inherit; }
 .hours-ranges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .hours-range { display: inline-flex; align-items: center; gap: 6px; }
 .input.mini-time { width: 116px; padding: 6px 8px; display: inline-block; }
+
+/* Books: ledger tables */
+.data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.data-table th, .data-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.data-table th { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.data-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.data-table tfoot .total-row td { font-weight: 700; border-top: 2px solid var(--line); border-bottom: none; }
+.cap { text-transform: capitalize; }

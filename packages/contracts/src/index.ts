@@ -515,3 +515,60 @@ export interface PackageTxn {
   orderId: string | null;
   createdAt: string;
 }
+
+
+// ---- General ledger ----
+export type AccountType = "asset" | "liability" | "equity" | "revenue" | "expense";
+export type NormalSide = "debit" | "credit";
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  normalSide: NormalSide;
+  isActive: boolean;
+}
+export interface JournalLineInput {
+  accountId: string;
+  debitCents: number;
+  creditCents: number;
+}
+export interface JournalLine {
+  id: string;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  debitCents: number;
+  creditCents: number;
+}
+export interface JournalEntry {
+  id: string;
+  entryDate: string;
+  memo: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  reversesEntryId: string | null;
+  createdAt: string;
+  lines: JournalLine[];
+}
+export interface JournalEntryListItem {
+  id: string;
+  entryDate: string;
+  memo: string | null;
+  sourceType: string | null;
+  totalCents: number; // sum of debits
+  createdAt: string;
+}
+export interface TrialBalanceRow {
+  accountId: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  debitCents: number;
+  creditCents: number;
+}
+export interface TrialBalance {
+  rows: TrialBalanceRow[];
+  totalDebitCents: number;
+  totalCreditCents: number;
+}
