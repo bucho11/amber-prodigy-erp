@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PermissionDef, RoleWithPermissions, TeamMember } from "@prodigy/contracts";
 import { api } from "./api";
 import { useAuth } from "./auth";
+import { ProvidersAdmin } from "./Staff";
 
 export function Team() {
   const { hasPermission, user } = useAuth();
   const canStaff = hasPermission("staff.manage");
   const canRoles = hasPermission("roles.manage");
+  const [section, setSection] = useState<"logins" | "providers">("logins");
 
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [roles, setRoles] = useState<RoleWithPermissions[]>([]);
@@ -52,6 +54,21 @@ export function Team() {
       {error && <p className="bad small">{error}</p>}
 
       {canStaff && (
+        <div className="subtabs">
+          <button className={section === "logins" ? "subtab active" : "subtab"} onClick={() => setSection("logins")}>
+            Logins &amp; roles
+          </button>
+          <button className={section === "providers" ? "subtab active" : "subtab"} onClick={() => setSection("providers")}>
+            Providers
+          </button>
+        </div>
+      )}
+
+      {canStaff && section === "providers" ? (
+        <ProvidersAdmin />
+      ) : (
+        <>
+      {canStaff && (
         <>
           <InviteForm roles={assignableRoles} />
           <section className="card">
@@ -88,6 +105,8 @@ export function Team() {
         canStaff && (
           <p className="muted small">Only the Owner (or a role with permission management) can edit role permissions.</p>
         )
+      )}
+        </>
       )}
     </>
   );

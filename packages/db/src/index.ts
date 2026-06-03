@@ -300,6 +300,13 @@ async function applySchema(): Promise<void> {
 
     -- Link generated appointments back to their protocol instance.
     ALTER TABLE appointments ADD COLUMN IF NOT EXISTS protocol_instance_id BIGINT REFERENCES protocol_instances(id);
+
+    -- Provider profile fields (slice 7); placed last so app_users exists for the FK.
+    ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS email TEXT;
+    ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS bio TEXT;
+    ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS color TEXT;
+    ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES app_users(id);
   `);
 }
 
@@ -436,3 +443,4 @@ export * from "./auth";
 export * from "./clients";
 export * from "./scheduling";
 export * from "./protocols";
+export * from "./staff";

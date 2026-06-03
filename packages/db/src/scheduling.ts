@@ -66,12 +66,12 @@ function mapAppointment(row: AppointmentRow): Appointment {
 
 // ---------- providers (active staff who deliver services) ----------
 export async function listProviders(tenantId: string): Promise<Provider[]> {
-  const rows = await query<{ id: string; display_name: string; title: string | null }>(
-    `SELECT id::text AS id, display_name, title FROM staff_profiles
+  const rows = await query<{ id: string; display_name: string; title: string | null; color: string | null }>(
+    `SELECT id::text AS id, display_name, title, color FROM staff_profiles
      WHERE tenant_id = $1 AND is_active = true ORDER BY display_name`,
     [tenantId]
   );
-  return rows.map((r) => ({ id: r.id, displayName: r.display_name, title: r.title }));
+  return rows.map((r) => ({ id: r.id, displayName: r.display_name, title: r.title, color: r.color }));
 }
 
 // ---------- reference checks ----------

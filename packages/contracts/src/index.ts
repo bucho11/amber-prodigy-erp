@@ -223,6 +223,7 @@ export interface Provider {
   id: string;
   displayName: string;
   title: string | null;
+  color: string | null;
 }
 
 export interface Appointment {
@@ -304,4 +305,26 @@ export interface ApplyProtocolResult {
   instance: ProtocolInstance;
   created: Appointment[];
   skipped: ApplyProtocolSkip[];
+}
+
+
+// ---- Staff / providers (bookable team) ----
+export interface StaffMember {
+  id: string;
+  displayName: string;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  bio: string | null;
+  color: string | null;
+  isActive: boolean;
+  userId: string | null;    // linked login account, if any
+  userEmail: string | null; // that login's email (joined)
+  createdAt: string;
+}
+
+export interface LinkableUser {
+  id: string;
+  email: string;
+  displayName: string;
 }

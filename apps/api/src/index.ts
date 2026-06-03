@@ -25,6 +25,7 @@ import { registerAuthRoutes } from "./routes-auth";
 import { registerClientRoutes } from "./routes-clients";
 import { registerSchedulingRoutes } from "./routes-scheduling";
 import { registerProtocolRoutes } from "./routes-protocols";
+import { registerStaffRoutes } from "./routes-staff";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -80,6 +81,9 @@ registerSchedulingRoutes(api);
 
 // Auto-protocol scheduler routes.
 registerProtocolRoutes(api);
+
+// Staff / providers routes.
+registerStaffRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
