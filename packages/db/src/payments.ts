@@ -70,9 +70,11 @@ async function fetchLines(tenantId: string, orderId: string): Promise<OrderLineI
     taxable: boolean;
     service_variant_id: string | null;
     appointment_id: string | null;
+    package_id: string | null;
   }>(
     `SELECT id::text AS id, kind, description, quantity, unit_price_cents, amount_cents, taxable,
-            service_variant_id::text AS service_variant_id, appointment_id::text AS appointment_id
+            service_variant_id::text AS service_variant_id, appointment_id::text AS appointment_id,
+            package_id::text AS package_id
      FROM order_line_items WHERE tenant_id = $1 AND order_id = $2 ORDER BY id`,
     [tenantId, orderId]
   );
@@ -86,6 +88,7 @@ async function fetchLines(tenantId: string, orderId: string): Promise<OrderLineI
     taxable: r.taxable,
     serviceVariantId: r.service_variant_id,
     appointmentId: r.appointment_id,
+    packageId: r.package_id,
   }));
 }
 
@@ -265,7 +268,21 @@ export async function addLineItem(tenantId: string, orderId: string, input: AddL
 
 export async function removeLineItem(tenantId: string, orderId: string, lineId: string): Promise<Order> {
   await requireOpen(tenantId, orderId);
-  await query(`DELETE FROM order_line_items WHERE tenant_id = $1 AND order_id = $2 AND id = $3`, [tenantId, orderId, lineId]);
+  await withTransaction(async (q) => {
+    const rows = await q<{ package_id: string | null }>(
+      `SELECT package_id::text AS package_id FROM order_line_items WHERE tenant_id = $1 AND order_id = $2 AND id = $3`,
+      [tenantId, orderId, lineId]
+    );
+    await q(`DELETE FROM order_line_items WHERE tenant_id = $1 AND order_id = $2 AND id = $3`, [tenantId, orderId, lineId]);
+    const pkg = rows[0]?.package_id;
+    if (pkg) {
+      await q(`UPDATE packages SET remaining_credits = remaining_credits + 1 WHERE tenant_id = $1 AND id = $2`, [tenantId, pkg]);
+      await q(
+        `INSERT INTO package_txns (tenant_id, package_id, kind, credits, order_id) VALUES ($1, $2::bigint, 'restore', 1, $3::bigint)`,
+        [tenantId, pkg, orderId]
+      );
+    }
+  });
   await recompute(tenantId, orderId);
   return (await getOrder(tenantId, orderId))!;
 }
@@ -329,7 +346,18 @@ export async function voidOrder(tenantId: string, orderId: string): Promise<Orde
   const existing = await getOrder(tenantId, orderId);
   if (!existing) throw new OrderNotFoundError();
   if (existing.status !== "open") throw new OrderClosedError();
-  await query(`UPDATE orders SET status = 'void', closed_at = now() WHERE tenant_id = $1 AND id = $2`, [tenantId, orderId]);
+  await withTransaction(async (q) => {
+    await q(`UPDATE orders SET status = 'void', closed_at = now() WHERE tenant_id = $1 AND id = $2`, [tenantId, orderId]);
+    for (const li of existing.lineItems) {
+      if (li.packageId) {
+        await q(`UPDATE packages SET remaining_credits = remaining_credits + 1 WHERE tenant_id = $1 AND id = $2`, [tenantId, li.packageId]);
+        await q(
+          `INSERT INTO package_txns (tenant_id, package_id, kind, credits, order_id) VALUES ($1, $2::bigint, 'restore', 1, $3::bigint)`,
+          [tenantId, li.packageId, orderId]
+        );
+      }
+    }
+  });
   return (await getOrder(tenantId, orderId))!;
 }
 

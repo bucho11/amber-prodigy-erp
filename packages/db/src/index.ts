@@ -445,6 +445,35 @@ async function applySchema(): Promise<void> {
       created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_gift_card_txns ON gift_card_txns(tenant_id, gift_card_id);
+
+    -- Service packages (slice 12): prepaid credits for a service, redeemed at checkout.
+    CREATE TABLE IF NOT EXISTS packages (
+      id                 BIGSERIAL PRIMARY KEY,
+      tenant_id          BIGINT NOT NULL REFERENCES tenants(id),
+      client_id          BIGINT NOT NULL REFERENCES clients(id),
+      service_variant_id BIGINT NOT NULL REFERENCES service_variants(id),
+      total_credits      INTEGER NOT NULL,
+      remaining_credits  INTEGER NOT NULL,
+      price_cents        INTEGER NOT NULL DEFAULT 0,
+      status             TEXT NOT NULL DEFAULT 'active',
+      note               TEXT,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_packages_client ON packages(tenant_id, client_id);
+
+    CREATE TABLE IF NOT EXISTS package_txns (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      package_id  BIGINT NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+      kind        TEXT NOT NULL,      -- issue | redeem | restore | void
+      credits     INTEGER NOT NULL,   -- signed
+      order_id    BIGINT REFERENCES orders(id),
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_package_txns ON package_txns(tenant_id, package_id);
+
+    -- Link an order line to the package credit that covered it (placed after packages exists).
+    ALTER TABLE order_line_items ADD COLUMN IF NOT EXISTS package_id BIGINT REFERENCES packages(id);
   `);
 }
 
@@ -586,3 +615,4 @@ export * from "./payments";
 export * from "./clinical";
 export * from "./availability";
 export * from "./giftcards";
+export * from "./packages";

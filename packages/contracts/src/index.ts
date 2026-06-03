@@ -345,6 +345,7 @@ export interface OrderLineItem {
   taxable: boolean;
   serviceVariantId: string | null;
   appointmentId: string | null;
+  packageId: string | null; // set when this line was covered by a package credit
 }
 
 export interface OrderPayment {
@@ -487,6 +488,30 @@ export interface GiftCardTxn {
   id: string;
   kind: string;        // issue | redeem | void
   amountCents: number; // signed
+  orderId: string | null;
+  createdAt: string;
+}
+
+
+// ---- Service packages ----
+export type PackageStatus = "active" | "void";
+export interface ServicePackage {
+  id: string;
+  clientId: string;
+  clientName: string | null;
+  serviceVariantId: string;
+  serviceName: string | null; // "Service · Variant"
+  totalCredits: number;
+  remainingCredits: number;
+  priceCents: number;
+  status: PackageStatus;
+  note: string | null;
+  createdAt: string;
+}
+export interface PackageTxn {
+  id: string;
+  kind: string;        // issue | redeem | restore | void
+  credits: number;     // signed
   orderId: string | null;
   createdAt: string;
 }

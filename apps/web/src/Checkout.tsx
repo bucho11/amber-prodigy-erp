@@ -5,6 +5,8 @@ import type {
   GiftCard,
   GiftCardTxn,
   Order,
+  PackageTxn,
+  ServicePackage,
   OrderListItem,
   PaymentMethod,
   PaymentsConfig,
@@ -25,7 +27,7 @@ const METHOD_LABEL: Record<PaymentMethod, string> = {
   other: "Other",
 };
 
-type CTab = "sale" | "recent" | "giftcards" | "setup";
+type CTab = "sale" | "recent" | "giftcards" | "packages" | "setup";
 
 export function CheckoutPage() {
   const { hasPermission } = useAuth();
@@ -33,6 +35,7 @@ export function CheckoutPage() {
   const canHistory = hasPermission("financials.view");
   const canSetup = hasPermission("settings.manage");
   const canGiftCards = hasPermission("sales.manage");
+  const canPackages = hasPermission("sales.manage");
   const first: CTab = canOperate ? "sale" : canHistory ? "recent" : canGiftCards ? "giftcards" : "setup";
   const [tab, setTab] = useState<CTab>(first);
   const [config, setConfig] = useState<PaymentsConfig | null>(null);
@@ -72,6 +75,11 @@ export function CheckoutPage() {
             Gift cards
           </button>
         )}
+        {canPackages && (
+          <button className={tab === "packages" ? "subtab active" : "subtab"} onClick={() => setTab("packages")}>
+            Packages
+          </button>
+        )}
         {canSetup && (
           <button className={tab === "setup" ? "subtab active" : "subtab"} onClick={() => setTab("setup")}>
             Payments setup
@@ -82,6 +90,7 @@ export function CheckoutPage() {
       {tab === "sale" && canOperate && <SaleView config={config} />}
       {tab === "recent" && canHistory && <RecentView canOperate={canOperate} />}
       {tab === "giftcards" && canGiftCards && <GiftCardsView />}
+      {tab === "packages" && canPackages && <PackagesView />}
       {tab === "setup" && canSetup && <SetupView config={config} onChanged={loadConfig} />}
     </>
   );
@@ -153,6 +162,7 @@ function Ticket({
 }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [appts, setAppts] = useState<Appointment[]>([]);
+  const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [variantId, setVariantId] = useState("");
   const [cDesc, setCDesc] = useState("");
@@ -174,6 +184,15 @@ function Ticket({
         .then((r) => setAppts(r.appointments.filter((a) => a.status === "booked" || a.status === "completed").slice(-5)))
         .catch(() => {});
     }
+  }, [order.clientId]);
+  const loadPackages = () => {
+    if (order.clientId)
+      api<{ packages: ServicePackage[] }>(`/clients/${order.clientId}/packages`).then((r) => setPackages(r.packages)).catch(() => {});
+    else setPackages([]);
+  };
+  useEffect(() => {
+    loadPackages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.clientId]);
   useEffect(() => {
     setPayAmount((order.balanceCents / 100).toFixed(2));
@@ -239,6 +258,15 @@ function Ticket({
     setCQty("1");
     setCTax(false);
   };
+  const redeemPackage = (packageId: string) => {
+    setErr(null);
+    api<{ order: Order }>(`/orders/${order.id}/redeem-package`, "POST", { packageId })
+      .then((r) => {
+        onOrder(r.order);
+        loadPackages();
+      })
+      .catch((e) => setErr((e as Error).message));
+  };
 
   const takePayment = () => {
     const amount = dollarsToCents(payAmount);
@@ -302,6 +330,19 @@ function Ticket({
               {appts.map((a) => (
                 <button key={a.id} className="chip" onClick={() => addAppt(a)}>
                   {a.variantName} · {fmt(a.priceCents)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {packages.length > 0 && (
+          <div className="quick-appts">
+            <span className="muted small">Use a package credit:</span>
+            <div className="chip-row">
+              {packages.map((pk) => (
+                <button key={pk.id} className="chip" onClick={() => redeemPackage(pk.id)}>
+                  {pk.serviceName || "Package"} · {pk.remainingCredits} left
                 </button>
               ))}
             </div>
@@ -824,6 +865,214 @@ function GiftCardsView() {
                 <div className="muted small">
                   {fmt(c.balanceCents)} of {fmt(c.initialCents)}
                   {c.clientName ? ` · ${c.clientName}` : ""}
+                </div>
+              </div>
+              <span className="chev">›</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
+function PackagesView() {
+  const [packages, setPackages] = useState<ServicePackage[] | null>(null);
+  const [detail, setDetail] = useState<{ pkg: ServicePackage; txns: PackageTxn[] } | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [clientId, setClientId] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [variantId, setVariantId] = useState("");
+  const [credits, setCredits] = useState("5");
+  const [price, setPrice] = useState("");
+  const [note, setNote] = useState("");
+  const [selling, setSelling] = useState(false);
+
+  const load = async () => {
+    try {
+      const r = await api<{ packages: ServicePackage[] }>("/packages");
+      setPackages(r.packages);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  useEffect(() => {
+    void load();
+    api<Catalog>("/catalog").then(setCatalog).catch(() => {});
+  }, []);
+
+  const variants = useMemo(() => {
+    if (!catalog) return [];
+    return catalog.services
+      .filter((s) => s.isActive)
+      .flatMap((s) => s.variants.filter((v) => v.isActive).map((v) => ({ id: v.id, label: `${s.name} · ${v.name}`, price: v.priceCents })));
+  }, [catalog]);
+
+  const sell = async () => {
+    if (!clientId) return setError("Choose a client.");
+    if (!variantId) return setError("Choose a service.");
+    const n = parseInt(credits) || 0;
+    if (n < 1) return setError("Enter how many credits.");
+    setSelling(true);
+    setError(null);
+    try {
+      await api("/packages", "POST", {
+        clientId,
+        serviceVariantId: variantId,
+        totalCredits: n,
+        priceCents: dollarsToCents(price),
+        note: note.trim() || null,
+      });
+      setClientId("");
+      setClientName("");
+      setVariantId("");
+      setCredits("5");
+      setPrice("");
+      setNote("");
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSelling(false);
+    }
+  };
+
+  const open = async (id: string) => {
+    try {
+      const r = await api<{ package: ServicePackage; transactions: PackageTxn[] }>(`/packages/${id}`);
+      setDetail({ pkg: r.package, txns: r.transactions });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const voidPkg = async () => {
+    if (!detail) return;
+    try {
+      const r = await api<{ package: ServicePackage }>(`/packages/${detail.pkg.id}/void`, "POST");
+      setDetail({ ...detail, pkg: r.package });
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  if (detail) {
+    return (
+      <section className="card">
+        <button className="link-btn" onClick={() => setDetail(null)}>
+          ‹ Back to packages
+        </button>
+        <div className="ticket-head">
+          <h2>{detail.pkg.serviceName || "Package"}</h2>
+          <span className={`status-badge s-${detail.pkg.status === "active" ? "completed" : "cancelled"}`}>{detail.pkg.status}</span>
+        </div>
+        <div className="totals" style={{ borderTop: "none", paddingTop: 0 }}>
+          <div className="totline grand">
+            <span>Credits left</span>
+            <span>
+              {detail.pkg.remainingCredits} of {detail.pkg.totalCredits}
+            </span>
+          </div>
+          {detail.pkg.clientName && (
+            <div className="totline">
+              <span className="muted small">Client</span>
+              <span>{detail.pkg.clientName}</span>
+            </div>
+          )}
+          <div className="totline">
+            <span className="muted small">Sold for</span>
+            <span>{fmt(detail.pkg.priceCents)}</span>
+          </div>
+          {detail.pkg.note && (
+            <div className="totline">
+              <span className="muted small">Note</span>
+              <span>{detail.pkg.note}</span>
+            </div>
+          )}
+        </div>
+        <div className="pay-list">
+          {detail.txns.map((t) => (
+            <div key={t.id} className="totline">
+              <span className="muted small">
+                {t.kind}
+                {t.createdAt ? ` · ${new Date(t.createdAt).toLocaleDateString()}` : ""}
+              </span>
+              <span>
+                {t.credits >= 0 ? "+" : ""}
+                {t.credits} credit{Math.abs(t.credits) === 1 ? "" : "s"}
+              </span>
+            </div>
+          ))}
+        </div>
+        {error && <p className="bad small">{error}</p>}
+        {detail.pkg.status === "active" && (
+          <div className="editor-actions">
+            <button className="btn" onClick={() => void voidPkg()}>
+              Void package
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <>
+      <section className="card">
+        <h2>Sell a package</h2>
+        <label className="field">
+          <span>Client</span>
+          <ClientPicker value={clientId} displayName={clientName} onPick={(id, n) => { setClientId(id); setClientName(n); }} />
+        </label>
+        <label className="field">
+          <span>Service</span>
+          <select className="input" value={variantId} onChange={(e) => setVariantId(e.target.value)}>
+            <option value="">Choose a service&hellip;</option>
+            {variants.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label} — {fmt(v.price)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="form-row">
+          <label className="field" style={{ maxWidth: 130 }}>
+            <span>Credits</span>
+            <input className="input" value={credits} inputMode="numeric" onChange={(e) => setCredits(e.target.value)} />
+          </label>
+          <label className="field" style={{ maxWidth: 150 }}>
+            <span>Price</span>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span className="dollar">$</span>
+              <input className="input" value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} />
+            </div>
+          </label>
+        </div>
+        <input className="input" placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+        {error && <p className="bad small">{error}</p>}
+        <div className="editor-actions">
+          <button className="btn primary" disabled={selling} onClick={() => void sell()}>
+            {selling ? "Saving\u2026" : "Sell package"}
+          </button>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>Packages</h2>
+        {!packages && <p className="muted">Loading&hellip;</p>}
+        {packages && packages.length === 0 && <p className="muted small">No packages yet.</p>}
+        <ul className="plain-list">
+          {packages?.map((pk) => (
+            <li key={pk.id} className="list-row clickable" onClick={() => void open(pk.id)}>
+              <div>
+                <div className="list-title">
+                  {pk.serviceName || "Package"}
+                  <span className={`status-badge s-${pk.status === "active" ? "completed" : "cancelled"}`}>{pk.status}</span>
+                </div>
+                <div className="muted small">
+                  {pk.remainingCredits} of {pk.totalCredits} left
+                  {pk.clientName ? ` · ${pk.clientName}` : ""}
                 </div>
               </div>
               <span className="chev">›</span>

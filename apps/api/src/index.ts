@@ -30,6 +30,7 @@ import { registerPaymentRoutes } from "./routes-payments";
 import { registerClinicalRoutes } from "./routes-clinical";
 import { registerAvailabilityRoutes } from "./routes-availability";
 import { registerGiftCardRoutes } from "./routes-giftcards";
+import { registerPackageRoutes } from "./routes-packages";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -100,6 +101,9 @@ registerAvailabilityRoutes(api);
 
 // Gift card routes.
 registerGiftCardRoutes(api);
+
+// Service package routes.
+registerPackageRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
@@ -286,6 +290,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
       return;
     }
     if (err.name === "GiftCardError") {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err.name === "PackageError") {
       res.status(400).json({ error: err.message });
       return;
     }
