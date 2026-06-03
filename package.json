@@ -1,0 +1,17 @@
+{
+  "name": "amber-prodigy-erp",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w @prodigy/web && npm run build -w @prodigy/api",
+    "start": "node apps/api/dist/index.js",
+    "dev": "npm run build && npm run start"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "@types/node": "^20.16.10"
+  }
+}

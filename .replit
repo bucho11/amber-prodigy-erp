@@ -1,0 +1,4 @@
+# Replit "Run" button (in-editor preview). Deployment (Publish) build/run is set
+# in Replit's Deploy UI — intended: build = "npm install && npm run build", run = "npm run start".
+# We'll confirm those in the UI when connecting, since Replit's deploy config shifts.
+run = "npm install && npm run dev"
