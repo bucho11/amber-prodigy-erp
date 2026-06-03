@@ -8,6 +8,7 @@ import { Team } from "./Team";
 import { ClientsAdmin } from "./Clients";
 import { ScheduleAdmin } from "./Schedule";
 import { ProtocolsAdmin } from "./Protocols";
+import { CheckoutPage } from "./Checkout";
 
 export function App() {
   return (
@@ -35,7 +36,7 @@ function Root() {
   return <Shell />;
 }
 
-type Tab = "dashboard" | "schedule" | "protocols" | "clients" | "services" | "team";
+type Tab = "dashboard" | "schedule" | "protocols" | "clients" | "checkout" | "services" | "team";
 
 function Shell() {
   const { user, logout, hasPermission } = useAuth();
@@ -45,12 +46,14 @@ function Shell() {
   const canClients = hasPermission("clients.view");
   const canCatalog = hasPermission("catalog.manage");
   const canTeam = hasPermission("staff.manage") || hasPermission("roles.manage");
+  const canCheckout = hasPermission("pos.operate") || hasPermission("financials.view") || hasPermission("settings.manage");
 
   // Never render a tab the user can't access (e.g. after a permission change).
   const effectiveTab: Tab =
     (tab === "schedule" && !canSchedule) ||
     (tab === "protocols" && !canSchedule) ||
     (tab === "clients" && !canClients) ||
+    (tab === "checkout" && !canCheckout) ||
     (tab === "services" && !canCatalog) ||
     (tab === "team" && !canTeam)
       ? "dashboard"
@@ -80,6 +83,11 @@ function Shell() {
                 Clients
               </button>
             )}
+            {canCheckout && (
+              <button className={effectiveTab === "checkout" ? "tab active" : "tab"} onClick={() => setTab("checkout")}>
+                Checkout
+              </button>
+            )}
             {canCatalog && (
               <button className={effectiveTab === "services" ? "tab active" : "tab"} onClick={() => setTab("services")}>
                 Services &amp; Rooms
@@ -107,6 +115,7 @@ function Shell() {
         {effectiveTab === "schedule" && <ScheduleAdmin />}
         {effectiveTab === "protocols" && <ProtocolsAdmin />}
         {effectiveTab === "clients" && <ClientsAdmin />}
+        {effectiveTab === "checkout" && <CheckoutPage />}
         {effectiveTab === "services" && <ServicesAdmin />}
         {effectiveTab === "team" && <Team />}
       </main>

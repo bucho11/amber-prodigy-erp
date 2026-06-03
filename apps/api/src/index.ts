@@ -26,12 +26,13 @@ import { registerClientRoutes } from "./routes-clients";
 import { registerSchedulingRoutes } from "./routes-scheduling";
 import { registerProtocolRoutes } from "./routes-protocols";
 import { registerStaffRoutes } from "./routes-staff";
+import { registerPaymentRoutes } from "./routes-payments";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
 const app = express();
 app.set("trust proxy", true); // honor X-Forwarded-Proto behind Replit's proxy (correct invite URLs)
-app.use(express.json());
+app.use(express.json({ verify: (req, _res, buf) => { (req as unknown as { rawBody?: Buffer }).rawBody = buf; } }));
 
 // Public health endpoint (no tenant, no auth). Registered before the tenant router.
 app.get(
@@ -84,6 +85,9 @@ registerProtocolRoutes(api);
 
 // Staff / providers routes.
 registerStaffRoutes(api);
+
+// Payments / POS routes.
+registerPaymentRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
@@ -255,6 +259,20 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof ValidationError) {
     res.status(400).json({ error: err.message });
     return;
+  }
+  if (err instanceof Error) {
+    if (err.name === "OrderNotFoundError") {
+      res.status(404).json({ error: err.message });
+      return;
+    }
+    if (err.name === "OrderClosedError") {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err.name === "StripeNotConfiguredError") {
+      res.status(503).json({ error: err.message, comingSoon: true });
+      return;
+    }
   }
   console.error("[api] error:", err);
   res.status(500).json({ error: "Internal server error" });

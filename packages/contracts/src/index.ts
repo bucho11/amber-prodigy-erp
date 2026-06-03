@@ -328,3 +328,65 @@ export interface LinkableUser {
   email: string;
   displayName: string;
 }
+
+// ---- Point of sale / payments ----
+export type OrderStatus = "open" | "paid" | "void" | "refunded";
+export type LineKind = "service" | "product" | "custom";
+export type PaymentMethod = "cash" | "external_card" | "stripe_card" | "other";
+export type PaymentStatus = "recorded" | "pending" | "succeeded" | "failed" | "refunded";
+
+export interface OrderLineItem {
+  id: string;
+  kind: LineKind;
+  description: string;
+  quantity: number;
+  unitPriceCents: number;
+  amountCents: number; // quantity * unitPriceCents
+  taxable: boolean;
+  serviceVariantId: string | null;
+  appointmentId: string | null;
+}
+
+export interface OrderPayment {
+  id: string;
+  method: PaymentMethod;
+  amountCents: number;
+  status: PaymentStatus;
+  processorRef: string | null;
+  createdAt: string;
+}
+
+export interface Order {
+  id: string;
+  clientId: string | null;
+  clientName: string | null;
+  status: OrderStatus;
+  subtotalCents: number;
+  discountCents: number;
+  taxCents: number;
+  tipCents: number;
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+  lineItems: OrderLineItem[];
+  payments: OrderPayment[];
+  createdAt: string;
+  closedAt: string | null;
+}
+
+export interface OrderListItem {
+  id: string;
+  clientName: string | null;
+  status: OrderStatus;
+  totalCents: number;
+  paidCents: number;
+  createdAt: string;
+  closedAt: string | null;
+}
+
+export interface PaymentsConfig {
+  stripePlatformConfigured: boolean; // platform secret key present in the environment
+  stripeConnected: boolean; // this tenant has a connected account with charges enabled
+  taxRateBps: number;
+  methods: PaymentMethod[]; // payment methods currently available to take
+}

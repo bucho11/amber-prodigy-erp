@@ -307,6 +307,55 @@ async function applySchema(): Promise<void> {
     ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS bio TEXT;
     ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS color TEXT;
     ALTER TABLE staff_profiles ADD COLUMN IF NOT EXISTS user_id BIGINT REFERENCES app_users(id);
+
+    -- Billing / Stripe Connect state on the tenant (slice 8).
+    ALTER TABLE tenants ADD COLUMN IF NOT EXISTS tax_rate_bps INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_account_id TEXT;
+    ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_charges_enabled BOOLEAN NOT NULL DEFAULT false;
+
+    -- Point of sale / payments (slice 8). Money in integer cents.
+    CREATE TABLE IF NOT EXISTS orders (
+      id             BIGSERIAL PRIMARY KEY,
+      tenant_id      BIGINT NOT NULL REFERENCES tenants(id),
+      client_id      BIGINT REFERENCES clients(id),
+      status         TEXT NOT NULL DEFAULT 'open',
+      subtotal_cents INTEGER NOT NULL DEFAULT 0,
+      discount_cents INTEGER NOT NULL DEFAULT 0,
+      tax_cents      INTEGER NOT NULL DEFAULT 0,
+      tip_cents      INTEGER NOT NULL DEFAULT 0,
+      total_cents    INTEGER NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      closed_at      TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_orders_tenant ON orders(tenant_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_orders_client ON orders(tenant_id, client_id);
+
+    CREATE TABLE IF NOT EXISTS order_line_items (
+      id                 BIGSERIAL PRIMARY KEY,
+      tenant_id          BIGINT NOT NULL REFERENCES tenants(id),
+      order_id           BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      kind               TEXT NOT NULL DEFAULT 'custom',
+      description        TEXT NOT NULL,
+      quantity           INTEGER NOT NULL DEFAULT 1,
+      unit_price_cents   INTEGER NOT NULL DEFAULT 0,
+      amount_cents       INTEGER NOT NULL DEFAULT 0,
+      taxable            BOOLEAN NOT NULL DEFAULT false,
+      service_variant_id BIGINT REFERENCES service_variants(id),
+      appointment_id     BIGINT REFERENCES appointments(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_lines_order ON order_line_items(order_id);
+
+    CREATE TABLE IF NOT EXISTS payments (
+      id            BIGSERIAL PRIMARY KEY,
+      tenant_id     BIGINT NOT NULL REFERENCES tenants(id),
+      order_id      BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      method        TEXT NOT NULL,
+      amount_cents  INTEGER NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'recorded',
+      processor_ref TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
   `);
 }
 
@@ -444,3 +493,4 @@ export * from "./clients";
 export * from "./scheduling";
 export * from "./protocols";
 export * from "./staff";
+export * from "./payments";
