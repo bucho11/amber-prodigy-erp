@@ -140,3 +140,34 @@ a.btn.block { padding: 10px 16px; }
 .archive-btn { margin-left: auto; }
 .footer-note { text-align: center; margin-top: 16px; }
 header .link-btn { padding-left: 0; margin-bottom: 4px; }
+
+/* ---- schedule / calendar ---- */
+.day-nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.day-input { width: auto; flex: 0 0 auto; }
+.book-btn { margin-left: auto; }
+.day-label { font-weight: 600; margin: 14px 0 4px; }
+.agenda { list-style: none; margin: 8px 0 0; padding: 0; }
+.agenda-row { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.agenda-row:last-child { border-bottom: 0; }
+.agenda-row.status-cancelled { opacity: 0.55; }
+.agenda-time { display: flex; flex-direction: column; align-items: flex-end; min-width: 76px; padding-top: 1px; }
+.agenda-time b { font-variant-numeric: tabular-nums; }
+.agenda-body { flex: 1; }
+.agenda-line1 { display: flex; align-items: center; gap: 10px; }
+.agenda-client { font-weight: 600; }
+.agenda-row.status-cancelled .agenda-client { text-decoration: line-through; }
+.agenda-notes { margin-top: 3px; font-style: italic; }
+.agenda-actions { display: flex; gap: 12px; margin-top: 7px; flex-wrap: wrap; }
+.status-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+.status-badge.s-booked { background: var(--accent-soft); color: var(--accent); }
+.status-badge.s-completed { background: #e9f3ec; color: var(--ok); }
+.status-badge.s-cancelled { background: var(--line); color: var(--muted); }
+.status-badge.s-no_show { background: #f6ecd9; color: var(--warn); }
+
+/* client picker */
+.picker-selected { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.picker-results { border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; overflow: hidden; }
+.picker-empty { padding: 10px 12px; }
+.picker-option { display: flex; flex-direction: column; gap: 1px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: #fff; padding: 9px 12px; cursor: pointer; font: inherit; }
+.picker-option:last-child { border-bottom: 0; }
+.picker-option:hover { background: var(--accent-soft); }

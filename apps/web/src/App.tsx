@@ -6,6 +6,7 @@ import { Dashboard } from "./Dashboard";
 import { ServicesAdmin } from "./Services";
 import { Team } from "./Team";
 import { ClientsAdmin } from "./Clients";
+import { ScheduleAdmin } from "./Schedule";
 
 export function App() {
   return (
@@ -33,18 +34,20 @@ function Root() {
   return <Shell />;
 }
 
-type Tab = "dashboard" | "clients" | "services" | "team";
+type Tab = "dashboard" | "schedule" | "clients" | "services" | "team";
 
 function Shell() {
   const { user, logout, hasPermission } = useAuth();
   const [tab, setTab] = useState<Tab>("dashboard");
   if (!user) return null; // Shell only renders when authenticated; this narrows the type.
+  const canSchedule = hasPermission("scheduling.view");
   const canClients = hasPermission("clients.view");
   const canCatalog = hasPermission("catalog.manage");
   const canTeam = hasPermission("staff.manage") || hasPermission("roles.manage");
 
   // Never render a tab the user can't access (e.g. after a permission change).
   const effectiveTab: Tab =
+    (tab === "schedule" && !canSchedule) ||
     (tab === "clients" && !canClients) ||
     (tab === "services" && !canCatalog) ||
     (tab === "team" && !canTeam)
@@ -60,6 +63,11 @@ function Shell() {
             <button className={effectiveTab === "dashboard" ? "tab active" : "tab"} onClick={() => setTab("dashboard")}>
               Dashboard
             </button>
+            {canSchedule && (
+              <button className={effectiveTab === "schedule" ? "tab active" : "tab"} onClick={() => setTab("schedule")}>
+                Calendar
+              </button>
+            )}
             {canClients && (
               <button className={effectiveTab === "clients" ? "tab active" : "tab"} onClick={() => setTab("clients")}>
                 Clients
@@ -89,6 +97,7 @@ function Shell() {
       </div>
       <main className="shell">
         {effectiveTab === "dashboard" && <Dashboard />}
+        {effectiveTab === "schedule" && <ScheduleAdmin />}
         {effectiveTab === "clients" && <ClientsAdmin />}
         {effectiveTab === "services" && <ServicesAdmin />}
         {effectiveTab === "team" && <Team />}

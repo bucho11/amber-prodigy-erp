@@ -215,3 +215,32 @@ export interface Client {
   createdAt: string;
   tags: Tag[];
 }
+
+// ---- Scheduling ----
+export type AppointmentStatus = "booked" | "completed" | "cancelled" | "no_show";
+
+export interface Provider {
+  id: string;
+  displayName: string;
+  title: string | null;
+}
+
+export interface Appointment {
+  id: string;
+  clientId: string;
+  clientName: string;
+  providerId: string;
+  providerName: string;
+  roomId: string | null;
+  roomName: string | null;
+  serviceVariantId: string;
+  serviceName: string;
+  variantName: string;
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  priceCents: number;
+  status: AppointmentStatus;
+  notes: string | null;
+  createdAt: string;
+}

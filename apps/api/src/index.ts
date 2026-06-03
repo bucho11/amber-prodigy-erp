@@ -23,6 +23,7 @@ import { ValidationError, reqString, optString, reqInt, optInt, optBool, wrap } 
 import { requireAuth, requirePermission, tenantOf } from "./security";
 import { registerAuthRoutes } from "./routes-auth";
 import { registerClientRoutes } from "./routes-clients";
+import { registerSchedulingRoutes } from "./routes-scheduling";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -72,6 +73,9 @@ registerAuthRoutes(api);
 
 // Clients / CRM routes.
 registerClientRoutes(api);
+
+// Scheduling routes.
+registerSchedulingRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(

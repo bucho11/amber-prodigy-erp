@@ -215,6 +215,26 @@ async function applySchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_client_tags_tenant ON client_tags(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_client_tags_tag ON client_tags(tag_id);
+
+    -- Scheduling
+    CREATE TABLE IF NOT EXISTS appointments (
+      id                 BIGSERIAL PRIMARY KEY,
+      tenant_id          BIGINT NOT NULL REFERENCES tenants(id),
+      client_id          BIGINT NOT NULL REFERENCES clients(id),
+      provider_id        BIGINT NOT NULL REFERENCES staff_profiles(id),
+      room_id            BIGINT REFERENCES rooms(id),
+      service_variant_id BIGINT NOT NULL REFERENCES service_variants(id),
+      starts_at          TIMESTAMPTZ NOT NULL,
+      ends_at            TIMESTAMPTZ NOT NULL,
+      price_cents        INTEGER NOT NULL DEFAULT 0,
+      status             TEXT NOT NULL DEFAULT 'booked',
+      notes              TEXT,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_appointments_tenant_time ON appointments(tenant_id, starts_at);
+    CREATE INDEX IF NOT EXISTS idx_appointments_provider ON appointments(tenant_id, provider_id, starts_at);
+    CREATE INDEX IF NOT EXISTS idx_appointments_room ON appointments(tenant_id, room_id, starts_at);
+    CREATE INDEX IF NOT EXISTS idx_appointments_client ON appointments(tenant_id, client_id);
   `);
 }
 
@@ -341,3 +361,4 @@ export async function getTenantBySlug(slug: string): Promise<TenantContext | nul
 export * from "./catalog";
 export * from "./auth";
 export * from "./clients";
+export * from "./scheduling";
