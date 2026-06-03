@@ -1,60 +1,27 @@
-import { useEffect, useState } from "react";
-import type { HealthResponse } from "@prodigy/contracts";
+import { useState } from "react";
+import { Dashboard } from "./Dashboard";
+import { ServicesAdmin } from "./Services";
+
+type Tab = "dashboard" | "services";
 
 export function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/health")
-      .then((r) => r.json())
-      .then((d: HealthResponse) => setHealth(d))
-      .catch((e) => setError(String(e)));
-  }, []);
-
-  const db = health?.database;
-
+  const [tab, setTab] = useState<Tab>("dashboard");
   return (
-    <main className="shell">
-      <header>
-        <p className="eyebrow">Prodigy ERP &middot; tenant&nbsp;#1</p>
-        <h1>Prodigy Massage and Wellness</h1>
-        <p className="sub">The operating system for clinical wellness businesses.</p>
-      </header>
-
-      <section className="card">
-        <h2>System status</h2>
-        {error && <p className="bad">Could not reach the API: {error}</p>}
-        {!health && !error && <p className="muted">Checking&hellip;</p>}
-        {health && (
-          <ul className="status">
-            <li><span>Service</span><b>{health.service} v{health.version}</b></li>
-            <li><span>Timezone</span><b>{health.timezone}</b></li>
-            <li>
-              <span>Database</span>
-              <b className={db?.connected ? "ok" : "warn"}>
-                {!db?.configured
-                  ? "not provisioned yet"
-                  : db.connected
-                  ? "connected"
-                  : "configured, not reachable"}
-              </b>
-            </li>
-            {db?.connected && (
-              <>
-                <li><span>Tenants</span><b>{db.tenants}</b></li>
-                <li><span>Staff seeded</span><b>{db.staff}</b></li>
-              </>
-            )}
-            <li><span>Server time (UTC)</span><b>{new Date(health.serverTimeUtc).toLocaleString()}</b></li>
-          </ul>
-        )}
-      </section>
-
-      <footer className="muted">
-        Slice 1 &mdash; foundation &amp; deploy loop. Booking, protocols, clinical notes,
-        payments, and marketing to follow.
-      </footer>
-    </main>
+    <div className="page">
+      <div className="topbar">
+        <nav className="topnav">
+          <div className="brand">Prodigy ERP</div>
+          <div className="tabs">
+            <button className={tab === "dashboard" ? "tab active" : "tab"} onClick={() => setTab("dashboard")}>
+              Dashboard
+            </button>
+            <button className={tab === "services" ? "tab active" : "tab"} onClick={() => setTab("services")}>
+              Services &amp; Rooms
+            </button>
+          </div>
+        </nav>
+      </div>
+      <main className="shell">{tab === "dashboard" ? <Dashboard /> : <ServicesAdmin />}</main>
+    </div>
   );
 }

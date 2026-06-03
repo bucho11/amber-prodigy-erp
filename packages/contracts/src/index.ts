@@ -7,9 +7,16 @@
  *  - Every business entity carries a tenantId.
  */
 export const APP_NAME = "amber-prodigy-erp" as const;
-export const APP_VERSION = "0.1.0" as const;
+export const APP_VERSION = "0.2.0" as const;
 
 export type Role = "owner" | "admin" | "therapist" | "front_desk" | "client";
+
+export interface TenantContext {
+  id: string;
+  slug: string;
+  name: string;
+  timezone: string;
+}
 
 export interface DbStatus {
   configured: boolean;
@@ -33,4 +40,43 @@ export interface TenantSummary {
   slug: string;
   name: string;
   timezone: string;
+}
+
+// ---- Service catalog & resources ----
+export interface ServiceCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface ServiceVariant {
+  id: string;
+  serviceId: string;
+  name: string;
+  durationMinutes: number;
+  priceCents: number;
+  isActive: boolean;
+}
+
+export interface Service {
+  id: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  variants: ServiceVariant[];
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface Catalog {
+  categories: ServiceCategory[];
+  services: Service[];
+  rooms: Room[];
 }

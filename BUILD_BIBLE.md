@@ -48,14 +48,18 @@ persistence + the seeded tenant on the next Publish.
 - Identity provider (orgs -> tenants): Clerk / Auth0 / WorkOS / other — not chosen.
 - Payment processor + surcharge BIN provider.
 - SMS provider + A2P 10DLC registration path.
-- Product inputs still needed (brief §13): full service menu + prices; treatment room count; full staff roster + roles (Amber & Keshia known); business hours; current monthly software spend; data export from current booking platform.
+- Product inputs (brief §13): now EDITABLE IN-APP — services / variants / prices / categories / rooms shipped in slice 2; staff + hours to follow. No longer a build blocker. Still worth collecting Amber's real menu, hours, current software spend, and a data export from her current booking platform for migration.
 
 ## 7. Decision log
 - 2026-06-02 — Repo `bucho11/amber-prodigy-erp`; GitHub-first bootstrap (code originates in the repo, Replit imports it to deploy).
 - 2026-06-02 — npm workspaces over pnpm (Replit-native).
 - 2026-06-02 — Express 4 for slice 1 (avoids v5 routing gotchas); revisit when needed.
 - 2026-06-02 — Graceful no-DB boot so the first Publish is always green; persistence activates when `DATABASE_URL` is present.
+- 2026-06-03 — Brief §13 "drop-in gap" (unknown per-business inputs) resolved by making the catalog editable in-app (slice 2). Doubles as future multi-tenant self-serve onboarding.
+- 2026-06-03 — Per-request tenant context: `x-tenant-slug` header → `req.tenant` (defaults to `prodigy`). Seam for real identity later; every catalog query is tenant-scoped.
+- 2026-06-03 — Partial updates use a fixed `COALESCE($n::type, col)` pattern (no dynamic SQL); soft-delete via `is_active`. Variant inserts use `INSERT…SELECT … WHERE service belongs to tenant` to enforce tenant ownership.
 
 ## 8. Build sequence (Phase 1)
 - Slice 1 (SHIPPED): monorepo + API + DB self-heal + seed tenant #1 + status page + deploy loop.
-- Next candidates: identity/auth + per-request tenant-context middleware -> service catalog & resources -> scheduling engine -> auto-protocol scheduler (the wedge) -> payments/POS -> clinical docs -> CRM -> marketing -> inventory -> staff ops -> reporting -> AI layer.
+- Slice 2 (SHIPPED): service catalog & resources — editable categories / services / variants (prices) / rooms; tenant-scoped CRUD API; self-healing schema extended; seeded Prodigy massage menu ($125/$185/$245); two-tab web UI (Dashboard + Services & Rooms).
+- Next candidates: identity/auth (pick provider) + clients/CRM -> scheduling engine -> auto-protocol scheduler (the wedge) -> payments/POS -> clinical docs -> marketing -> inventory -> staff ops + hours -> reporting -> AI layer.
