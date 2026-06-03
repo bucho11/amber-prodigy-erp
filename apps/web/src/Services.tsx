@@ -1,30 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Catalog, Service, ServiceCategory, ServiceVariant, Room } from "@prodigy/contracts";
-
-const API = "/api";
-
-async function api<T>(path: string, method: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  let data: unknown = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = null;
-  }
-  if (!res.ok) {
-    const msg =
-      data && typeof data === "object" && "error" in data && typeof (data as { error?: unknown }).error === "string"
-        ? (data as { error: string }).error
-        : `Request failed (${res.status})`;
-    throw new Error(msg);
-  }
-  return data as T;
-}
+import { api } from "./api";
 
 const formatPrice = (cents: number): string =>
   (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });

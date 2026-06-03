@@ -74,3 +74,50 @@ textarea.input { resize: vertical; margin-bottom: 12px; display: block; }
 .rooms { list-style: none; margin: 0 0 14px; padding: 0; }
 .rooms li { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .rooms li:last-child { border-bottom: 0; }
+
+/* ---- auth (login / setup / accept invite) ---- */
+.centered { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.auth-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+.auth-card h1 { font-size: 23px; margin: 2px 0 8px; }
+.auth-card .sub { margin-bottom: 20px; }
+.field { display: block; margin-bottom: 14px; }
+.field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.btn.block { width: 100%; display: block; text-align: center; text-decoration: none; margin-top: 4px; }
+a.btn.block { padding: 10px 16px; }
+
+/* ---- user menu in top bar ---- */
+.topnav { flex-wrap: wrap; }
+.user-menu { display: flex; align-items: center; gap: 12px; }
+.user-name { font-size: 13px; color: var(--ink); display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.user-role { font-size: 11px; color: var(--muted); }
+
+/* ---- team members ---- */
+.member { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.member:last-child { border-bottom: 0; padding-bottom: 0; }
+.member-main { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.member-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.member-actions { display: flex; align-items: center; gap: 10px; }
+.role-select { width: auto; min-width: 150px; }
+.role-badge { font-size: 13px; color: var(--accent); background: var(--accent-soft); padding: 5px 10px; border-radius: 8px; }
+.role-badge.full { color: var(--ok); background: #e9f3ec; }
+.tag { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; background: var(--accent-soft); color: var(--accent); padding: 2px 7px; border-radius: 6px; }
+.tag.muted-tag { background: var(--line); color: var(--muted); }
+
+/* invite link */
+.invite-result { margin-top: 12px; padding: 14px; background: var(--accent-soft); border-radius: 10px; }
+.invite-result .small { margin: 0 0 8px; }
+.invite-link { display: flex; gap: 8px; }
+.invite-link .input { background: #fff; }
+
+/* ---- roles & permissions ---- */
+.role-row { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.role-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.role-row-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.role-title { font-weight: 600; }
+.perm-editor { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 14px; }
+.perm-group { margin-bottom: 14px; }
+.perm-group-name { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--accent); margin-bottom: 6px; }
+.perm-item { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 14px; cursor: pointer; }
+.perm-item input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.perm-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.ok { color: var(--ok); }

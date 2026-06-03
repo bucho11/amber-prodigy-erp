@@ -48,7 +48,8 @@ export function Dashboard() {
       </section>
 
       <footer className="muted">
-        Foundation &amp; service menu live. Booking, protocols, clinical notes, payments, and marketing to follow.
+        Foundation, service menu, accounts &amp; role permissions live. Clients, scheduling, the post-surgical protocol
+        wedge, payments, clinical notes, and the accounting ledger to follow.
       </footer>
     </>
   );

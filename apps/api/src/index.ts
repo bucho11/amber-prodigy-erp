@@ -18,54 +18,18 @@ import {
   createRoom,
   updateRoom,
 } from "@prodigy/db";
-import { APP_NAME, APP_VERSION, type HealthResponse, type TenantContext } from "@prodigy/contracts";
+import { APP_NAME, APP_VERSION, type HealthResponse } from "@prodigy/contracts";
+import { ValidationError, reqString, optString, reqInt, optInt, optBool, wrap } from "./http";
+import { requireAuth, requirePermission, tenantOf } from "./security";
+import { registerAuthRoutes } from "./routes-auth";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
-class ValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ValidationError";
-  }
-}
-
-function reqString(v: unknown, field: string): string {
-  if (typeof v !== "string" || v.trim() === "") throw new ValidationError(`'${field}' is required`);
-  return v.trim();
-}
-function optString(v: unknown): string | undefined {
-  if (v === undefined || v === null) return undefined;
-  if (typeof v !== "string") throw new ValidationError("expected a string");
-  const t = v.trim();
-  return t === "" ? undefined : t;
-}
-function reqInt(v: unknown, field: string, min = 0): number {
-  const n = typeof v === "number" ? v : Number(v);
-  if (!Number.isInteger(n) || n < min) throw new ValidationError(`'${field}' must be a whole number >= ${min}`);
-  return n;
-}
-function optInt(v: unknown, field: string, min = 0): number | undefined {
-  if (v === undefined || v === null) return undefined;
-  return reqInt(v, field, min);
-}
-function optBool(v: unknown): boolean | undefined {
-  return typeof v === "boolean" ? v : undefined;
-}
-
-type AsyncHandler = (req: Request, res: Response) => Promise<void>;
-const wrap = (fn: AsyncHandler): RequestHandler => (req, res, next) => {
-  fn(req, res).catch(next);
-};
-
-function tenantOf(req: Request): TenantContext {
-  if (!req.tenant) throw new Error("tenant context not resolved");
-  return req.tenant;
-}
-
 const app = express();
+app.set("trust proxy", true); // honor X-Forwarded-Proto behind Replit's proxy (correct invite URLs)
 app.use(express.json());
 
-// Public health endpoint (no tenant). Registered before the tenant router.
+// Public health endpoint (no tenant, no auth). Registered before the tenant router.
 app.get(
   "/api/health",
   wrap(async (_req, res) => {
@@ -83,8 +47,7 @@ app.get(
   })
 );
 
-// Per-request tenant resolution. Seam for real auth/identity later; for now a
-// single tenant resolved by slug (defaults to Prodigy), so every query is scoped.
+// Per-request tenant resolution (single tenant for now; defaults to Prodigy).
 const resolveTenant: RequestHandler = (req, res, next) => {
   const header = req.header("x-tenant-slug");
   const slug = typeof header === "string" && header.trim() !== "" ? header.trim() : DEFAULT_TENANT_SLUG;
@@ -103,8 +66,13 @@ const resolveTenant: RequestHandler = (req, res, next) => {
 const api = express.Router();
 api.use(resolveTenant);
 
+// Auth, team, and roles routes.
+registerAuthRoutes(api);
+
+// ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
   "/catalog",
+  requireAuth,
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const [categories, services, rooms] = await Promise.all([
@@ -116,9 +84,10 @@ api.get(
   })
 );
 
-// Categories
 api.post(
   "/categories",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const name = reqString(req.body?.name, "name");
@@ -128,6 +97,8 @@ api.post(
 );
 api.patch(
   "/categories/:id",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const updated = await updateCategory(t.id, req.params.id, {
@@ -143,9 +114,10 @@ api.patch(
   })
 );
 
-// Services
 api.post(
   "/services",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const name = reqString(req.body?.name, "name");
@@ -156,6 +128,8 @@ api.post(
 );
 api.patch(
   "/services/:id",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const updated = await updateService(t.id, req.params.id, {
@@ -172,9 +146,10 @@ api.patch(
   })
 );
 
-// Variants
 api.post(
   "/services/:id/variants",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const name = reqString(req.body?.name, "name");
@@ -190,6 +165,8 @@ api.post(
 );
 api.patch(
   "/variants/:id",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const updated = await updateVariant(t.id, req.params.id, {
@@ -206,9 +183,10 @@ api.patch(
   })
 );
 
-// Rooms
 api.post(
   "/rooms",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const name = reqString(req.body?.name, "name");
@@ -217,6 +195,8 @@ api.post(
 );
 api.patch(
   "/rooms/:id",
+  requireAuth,
+  requirePermission("catalog.manage"),
   wrap(async (req, res) => {
     const t = tenantOf(req);
     const updated = await updateRoom(t.id, req.params.id, {

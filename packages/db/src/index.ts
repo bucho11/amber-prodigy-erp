@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import type { DbStatus, TenantContext } from "@prodigy/contracts";
+import { DEFAULT_ROLES, DEFAULT_ROLE_PERMISSIONS } from "@prodigy/contracts";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -122,10 +123,92 @@ async function applySchema(): Promise<void> {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_rooms_tenant ON rooms(tenant_id);
+
+    -- Identity & access (RBAC). Roles + permissions are per-tenant and owner-editable.
+    CREATE TABLE IF NOT EXISTS roles (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      key         TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      is_owner    BOOLEAN NOT NULL DEFAULT false,
+      is_system   BOOLEAN NOT NULL DEFAULT false,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (tenant_id, key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_roles_tenant ON roles(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      tenant_id      BIGINT NOT NULL REFERENCES tenants(id),
+      role_id        BIGINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+      permission_key TEXT NOT NULL,
+      PRIMARY KEY (role_id, permission_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_role_permissions_tenant ON role_permissions(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS app_users (
+      id            BIGSERIAL PRIMARY KEY,
+      tenant_id     BIGINT NOT NULL REFERENCES tenants(id),
+      email         TEXT NOT NULL,
+      password_hash TEXT,
+      display_name  TEXT NOT NULL,
+      role_id       BIGINT REFERENCES roles(id),
+      status        TEXT NOT NULL DEFAULT 'active',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (tenant_id, email)
+    );
+    CREATE INDEX IF NOT EXISTS idx_app_users_tenant ON app_users(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      user_id     BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      token_hash  TEXT NOT NULL UNIQUE,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at  TIMESTAMPTZ NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token_hash);
+
+    CREATE TABLE IF NOT EXISTS invitations (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      email       TEXT NOT NULL,
+      role_id     BIGINT NOT NULL REFERENCES roles(id),
+      token_hash  TEXT NOT NULL UNIQUE,
+      status      TEXT NOT NULL DEFAULT 'pending',
+      invited_by  BIGINT REFERENCES app_users(id),
+      expires_at  TIMESTAMPTZ NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_invitations_tenant ON invitations(tenant_id);
   `);
 }
 
-/** Seed tenant #1 (Prodigy) + confirmed staff + confirmed massage menu. Idempotent. */
+/** Seed default roles (+ starter permissions) for a tenant. Permissions seed only
+ *  when a role is first created, so later Owner edits are never overwritten. */
+async function seedRoles(tenantId: string): Promise<void> {
+  if (!pool) return;
+  for (const role of DEFAULT_ROLES) {
+    const res = await pool.query<{ id: string }>(
+      `INSERT INTO roles (tenant_id, key, name, is_owner, is_system)
+       VALUES ($1, $2, $3, $4, true)
+       ON CONFLICT (tenant_id, key) DO NOTHING
+       RETURNING id`,
+      [tenantId, role.key, role.name, role.isOwner]
+    );
+    const created = res.rows[0];
+    if (!created || role.isOwner) continue;
+    const perms = DEFAULT_ROLE_PERMISSIONS[role.key] ?? [];
+    if (perms.length === 0) continue;
+    const placeholders = perms.map((_, i) => `($1, $2, $${i + 3})`).join(", ");
+    await pool.query(
+      `INSERT INTO role_permissions (tenant_id, role_id, permission_key)
+       VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+      [tenantId, created.id, ...perms]
+    );
+  }
+}
+
+/** Seed tenant #1 (Prodigy) + roles + confirmed staff + confirmed massage menu. Idempotent. */
 async function seedTenantOne(): Promise<void> {
   if (!pool) return;
   const { rows } = await pool.query<{ id: string }>(
@@ -135,6 +218,8 @@ async function seedTenantOne(): Promise<void> {
      RETURNING id`
   );
   const tenantId = rows[0].id;
+
+  await seedRoles(tenantId);
 
   await pool.query(
     `INSERT INTO staff_profiles (tenant_id, display_name, title)
@@ -147,7 +232,6 @@ async function seedTenantOne(): Promise<void> {
     [tenantId]
   );
 
-  // Service categories (the niche's natural groupings).
   await pool.query(
     `INSERT INTO service_categories (tenant_id, name, sort_order)
      SELECT $1::bigint, c.name, c.ord
@@ -161,7 +245,6 @@ async function seedTenantOne(): Promise<void> {
     [tenantId]
   );
 
-  // Confirmed service: Therapeutic Massage (under Massage & Body).
   await pool.query(
     `INSERT INTO services (tenant_id, category_id, name, description)
      SELECT $1::bigint, sc.id, 'Therapeutic Massage', 'Customized therapeutic massage (Swedish, deep tissue, sports).'
@@ -173,7 +256,6 @@ async function seedTenantOne(): Promise<void> {
     [tenantId]
   );
 
-  // Confirmed pricing: 60/90/120 min = $125 / $185 / $245 (stored in cents).
   await pool.query(
     `INSERT INTO service_variants (tenant_id, service_id, name, duration_minutes, price_cents)
      SELECT $1::bigint, s.id, v.name, v.dur, v.price
@@ -199,7 +281,7 @@ export async function initDb(): Promise<void> {
   }
   await applySchema();
   await seedTenantOne();
-  console.log("[db] schema applied + tenant #1 + service menu seeded.");
+  console.log("[db] schema applied + tenant #1 + roles + service menu seeded.");
 }
 
 export async function getDbStatus(): Promise<DbStatus> {
@@ -222,3 +304,4 @@ export async function getTenantBySlug(slug: string): Promise<TenantContext | nul
 }
 
 export * from "./catalog";
+export * from "./auth";

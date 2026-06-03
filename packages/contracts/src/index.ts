@@ -80,3 +80,98 @@ export interface Catalog {
   services: Service[];
   rooms: Room[];
 }
+
+// ---- Auth & RBAC ----
+export interface PermissionDef {
+  key: string;
+  group: string;
+  label: string;
+}
+
+/** The full catalog of capabilities the platform enforces. Owner-configurable per role. */
+export const PERMISSION_CATALOG: readonly PermissionDef[] = [
+  { key: "scheduling.view", group: "Scheduling", label: "View calendar & appointments" },
+  { key: "scheduling.manage", group: "Scheduling", label: "Book, edit & cancel appointments" },
+  { key: "clients.view", group: "Clients", label: "View client list & contact info" },
+  { key: "clients.manage", group: "Clients", label: "Add & edit clients" },
+  { key: "clinical.view", group: "Clinical records", label: "View health intake & SOAP notes" },
+  { key: "clinical.manage", group: "Clinical records", label: "Create & edit clinical notes" },
+  { key: "catalog.manage", group: "Services & rooms", label: "Edit services, prices & rooms" },
+  { key: "pos.operate", group: "Point of sale", label: "Check out clients & take payment" },
+  { key: "sales.manage", group: "Gift cards & memberships", label: "Sell & manage gift cards, memberships, packages" },
+  { key: "inventory.view", group: "Inventory", label: "View product stock" },
+  { key: "inventory.manage", group: "Inventory", label: "Manage products & stock" },
+  { key: "financials.view", group: "Financials", label: "View financial reports" },
+  { key: "books.manage", group: "Accounting", label: "Manage the books (journal, reconcile, close)" },
+  { key: "payroll.view", group: "Payroll", label: "View payroll & commissions" },
+  { key: "payroll.run", group: "Payroll", label: "Run payroll" },
+  { key: "marketing.manage", group: "Marketing", label: "Manage campaigns & automations" },
+  { key: "reports.view", group: "Reports", label: "View business reports" },
+  { key: "staff.manage", group: "Team", label: "Invite & manage staff" },
+  { key: "roles.manage", group: "Team", label: "Create roles & set permissions" },
+  { key: "settings.manage", group: "Settings", label: "Manage business settings" },
+];
+
+export const PERMISSION_KEYS: readonly string[] = PERMISSION_CATALOG.map((p) => p.key);
+
+export interface RoleSeed {
+  key: string;
+  name: string;
+  isOwner: boolean;
+}
+
+/** Default roles seeded per tenant. The Owner can rename, re-permission, or add to these. */
+export const DEFAULT_ROLES: readonly RoleSeed[] = [
+  { key: "owner", name: "Owner", isOwner: true },
+  { key: "admin", name: "Manager / Admin", isOwner: false },
+  { key: "provider", name: "Provider", isOwner: false },
+  { key: "front_desk", name: "Front Desk", isOwner: false },
+  { key: "accountant", name: "Accountant / Bookkeeper", isOwner: false },
+  { key: "client", name: "Client", isOwner: false },
+];
+
+/** Sensible starting permissions per role. Seeded once; the Owner can change them anytime. */
+export const DEFAULT_ROLE_PERMISSIONS: Record<string, readonly string[]> = {
+  admin: [
+    "scheduling.view", "scheduling.manage", "clients.view", "clients.manage", "catalog.manage",
+    "pos.operate", "sales.manage", "inventory.view", "inventory.manage", "financials.view",
+    "reports.view", "marketing.manage", "staff.manage",
+  ],
+  provider: ["scheduling.view", "scheduling.manage", "clients.view", "clinical.view", "clinical.manage", "pos.operate"],
+  front_desk: ["scheduling.view", "scheduling.manage", "clients.view", "clients.manage", "pos.operate", "sales.manage"],
+  accountant: ["financials.view", "books.manage", "payroll.view", "reports.view"],
+  client: [],
+};
+
+export interface AuthUserRole {
+  id: string;
+  key: string;
+  name: string;
+  isOwner: boolean;
+}
+
+export interface AuthUser {
+  id: string;
+  tenantId: string;
+  email: string;
+  displayName: string;
+  role: AuthUserRole | null;
+  permissions: string[];
+}
+
+export interface TeamMember {
+  id: string;
+  email: string;
+  displayName: string;
+  status: string;
+  role: AuthUserRole | null;
+}
+
+export interface RoleWithPermissions {
+  id: string;
+  key: string;
+  name: string;
+  isOwner: boolean;
+  isSystem: boolean;
+  permissions: string[];
+}
