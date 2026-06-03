@@ -22,6 +22,7 @@ import { APP_NAME, APP_VERSION, type HealthResponse } from "@prodigy/contracts";
 import { ValidationError, reqString, optString, reqInt, optInt, optBool, wrap } from "./http";
 import { requireAuth, requirePermission, tenantOf } from "./security";
 import { registerAuthRoutes } from "./routes-auth";
+import { registerClientRoutes } from "./routes-clients";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -68,6 +69,9 @@ api.use(resolveTenant);
 
 // Auth, team, and roles routes.
 registerAuthRoutes(api);
+
+// Clients / CRM routes.
+registerClientRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(

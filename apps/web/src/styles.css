@@ -121,3 +121,22 @@ a.btn.block { padding: 10px 16px; }
 .perm-item input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
 .perm-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
 .ok { color: var(--ok); }
+
+/* ---- clients / CRM ---- */
+.checkline { display: flex; align-items: center; gap: 8px; margin: 8px 0; cursor: pointer; }
+.checkline input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.client-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.client-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 8px; border-bottom: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.client-row:hover { background: var(--accent-soft); }
+.client-row:last-child { border-bottom: 0; }
+.client-row-name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.client-row-side { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.chev { color: var(--muted); font-size: 20px; line-height: 1; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; background: var(--accent-soft); color: var(--accent); padding: 4px 9px; border-radius: 999px; white-space: nowrap; }
+.chip-x { border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+.chip-x:hover { color: var(--bad); }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.editor-actions { display: flex; align-items: center; gap: 12px; margin: 8px 0 4px; flex-wrap: wrap; }
+.archive-btn { margin-left: auto; }
+.footer-note { text-align: center; margin-top: 16px; }
+header .link-btn { padding-left: 0; margin-bottom: 4px; }

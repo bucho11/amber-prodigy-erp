@@ -180,6 +180,41 @@ async function applySchema(): Promise<void> {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_invitations_tenant ON invitations(tenant_id);
+
+    -- Clients / CRM (extends the foundation clients table)
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS first_name TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS last_name TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS pronouns TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS address_line1 TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS address_city TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS address_state TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS address_postal TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS emergency_contact_name TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS emergency_contact_phone TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS referral_source TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS sms_opt_in BOOLEAN NOT NULL DEFAULT false;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS notes TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+    CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(tenant_id, status);
+
+    CREATE TABLE IF NOT EXISTS tags (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      name        TEXT NOT NULL,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_tags_tenant ON tags(tenant_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_tags_tenant_name ON tags(tenant_id, lower(name));
+
+    CREATE TABLE IF NOT EXISTS client_tags (
+      tenant_id  BIGINT NOT NULL REFERENCES tenants(id),
+      client_id  BIGINT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      tag_id     BIGINT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+      PRIMARY KEY (client_id, tag_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_tags_tenant ON client_tags(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_client_tags_tag ON client_tags(tag_id);
   `);
 }
 
@@ -305,3 +340,4 @@ export async function getTenantBySlug(slug: string): Promise<TenantContext | nul
 
 export * from "./catalog";
 export * from "./auth";
+export * from "./clients";

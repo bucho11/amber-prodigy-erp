@@ -175,3 +175,43 @@ export interface RoleWithPermissions {
   isSystem: boolean;
   permissions: string[];
 }
+
+// ---- Clients / CRM ----
+export interface Tag {
+  id: string;
+  name: string;
+}
+
+export interface ClientListItem {
+  id: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  createdAt: string;
+  tags: Tag[];
+}
+
+export interface Client {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  dateOfBirth: string | null;
+  pronouns: string | null;
+  addressLine1: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressPostal: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  referralSource: string | null;
+  marketingOptIn: boolean;
+  smsOptIn: boolean;
+  notes: string | null;
+  status: string;
+  createdAt: string;
+  tags: Tag[];
+}
