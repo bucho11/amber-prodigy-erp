@@ -59,3 +59,33 @@ export function addDays(dateStr: string, days: number): string {
   const dd = String(dt.getUTCDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
 }
+
+
+const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+/** Convert a UTC instant into local wall-clock parts for an IANA zone. */
+export function utcToZonedParts(utcIso: string, timeZone: string): { date: string; minutes: number; dayOfWeek: number } {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    weekday: "short",
+  });
+  const map: Record<string, string> = {};
+  for (const p of dtf.formatToParts(new Date(utcIso))) map[p.type] = p.value;
+  const hour = map.hour === "24" ? "00" : map.hour;
+  return {
+    date: `${map.year}-${map.month}-${map.day}`,
+    minutes: Number(hour) * 60 + Number(map.minute),
+    dayOfWeek: WEEKDAY_INDEX[map.weekday] ?? 0,
+  };
+}
+
+/** Day-of-week (0=Sun..6=Sat) of a local calendar date in the given zone. */
+export function dayOfWeekFor(dateStr: string, timeZone: string): number {
+  return utcToZonedParts(zonedWallTimeToUtc(dateStr, "12:00", timeZone), timeZone).dayOfWeek;
+}

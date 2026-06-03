@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { LinkableUser, StaffMember } from "@prodigy/contracts";
 import { api } from "./api";
+import { ProviderAvailability } from "./Availability";
 
 const PALETTE = ["#7C3AED", "#0EA5E9", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#6366F1", "#14B8A6"];
 
@@ -137,6 +138,7 @@ function ProviderEditor({
   };
 
   return (
+    <>
     <section className="card">
       <button className="link-btn" onClick={onClose}>
         ‹ Back to providers
@@ -212,5 +214,7 @@ function ProviderEditor({
         </button>
       </div>
     </section>
+    {editing && <ProviderAvailability providerId={editing.id} />}
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Appointment, AppointmentStatus, Catalog, ClientListItem, Provider } from "@prodigy/contracts";
+import type { Appointment, AppointmentStatus, Catalog, ClientListItem, DayAvailability, Provider } from "@prodigy/contracts";
 import { api } from "./api";
 import { useAuth } from "./auth";
 
@@ -330,6 +330,8 @@ function BookingForm({
           </label>
         </div>
 
+        <SlotPicker providerId={providerId} date={date} serviceVariantId={serviceVariantId} value={time} onPick={setTime} />
+
         <label className="field">
           <span>Notes (optional)</span>
           <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Booking notes (not clinical)" />
@@ -417,6 +419,62 @@ export function ClientPicker({
           >
             <span>{c.displayName}</span>
             <span className="muted small">{[c.email, c.phone].filter(Boolean).join(" · ")}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+function SlotPicker({
+  providerId,
+  date,
+  serviceVariantId,
+  value,
+  onPick,
+}: {
+  providerId: string;
+  date: string;
+  serviceVariantId: string;
+  value: string;
+  onPick: (t: string) => void;
+}) {
+  const [data, setData] = useState<DayAvailability | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!providerId || !date || !serviceVariantId) {
+      setData(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    api<{ availability: DayAvailability }>(`/availability?providerId=${providerId}&date=${date}&serviceVariantId=${serviceVariantId}`)
+      .then((r) => {
+        if (!cancelled) setData(r.availability);
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [providerId, date, serviceVariantId]);
+
+  if (!providerId || !serviceVariantId) return null;
+  return (
+    <div className="slots-block">
+      <span className="muted small">Open times{loading ? " \u2026" : ""}</span>
+      {data && data.workingWindows.length === 0 && <p className="muted small">Not working this day.</p>}
+      {data && data.workingWindows.length > 0 && data.openSlots.length === 0 && <p className="muted small">No open slots this day.</p>}
+      <div className="chip-row">
+        {data?.openSlots.map((t) => (
+          <button key={t} type="button" className={`chip${value === t ? " sel" : ""}`} onClick={() => onPick(t)}>
+            {t}
           </button>
         ))}
       </div>

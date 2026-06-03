@@ -235,3 +235,12 @@ textarea.input { resize: vertical; min-height: 52px; font: inherit; }
 .method-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .pay-list { margin-top: 6px; border-top: 1px solid var(--line); padding-top: 6px; }
 .btn.sm { padding: 8px 12px; font-size: 13px; }
+
+/* ---- availability ---- */
+.slots-block { margin: -2px 0 6px; display: flex; flex-direction: column; gap: 6px; }
+.chip.sel { border-color: var(--accent, #7C3AED); box-shadow: 0 0 0 1px var(--accent, #7C3AED) inset; font-weight: 600; }
+.hours-day { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.hours-day-label { width: 96px; flex-shrink: 0; font-size: 14px; padding-top: 6px; }
+.hours-ranges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hours-range { display: inline-flex; align-items: center; gap: 6px; }
+.input.mini-time { width: 116px; padding: 6px 8px; display: inline-block; }

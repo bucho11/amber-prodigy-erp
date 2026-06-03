@@ -393,6 +393,31 @@ async function applySchema(): Promise<void> {
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_soap_client ON soap_notes(tenant_id, client_id, note_date DESC);
+
+    -- Provider availability (slice 10): weekly working hours + time off. Minutes = minutes-from-midnight, local wall time.
+    CREATE TABLE IF NOT EXISTS provider_hours (
+      id           BIGSERIAL PRIMARY KEY,
+      tenant_id    BIGINT NOT NULL REFERENCES tenants(id),
+      provider_id  BIGINT NOT NULL REFERENCES staff_profiles(id) ON DELETE CASCADE,
+      day_of_week  SMALLINT NOT NULL,
+      start_minute INTEGER NOT NULL,
+      end_minute   INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_provider_hours ON provider_hours(tenant_id, provider_id, day_of_week);
+
+    CREATE TABLE IF NOT EXISTS provider_time_off (
+      id           BIGSERIAL PRIMARY KEY,
+      tenant_id    BIGINT NOT NULL REFERENCES tenants(id),
+      provider_id  BIGINT NOT NULL REFERENCES staff_profiles(id) ON DELETE CASCADE,
+      start_date   DATE NOT NULL,
+      end_date     DATE NOT NULL,
+      all_day      BOOLEAN NOT NULL DEFAULT true,
+      start_minute INTEGER,
+      end_minute   INTEGER,
+      reason       TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_provider_time_off ON provider_time_off(tenant_id, provider_id, start_date);
   `);
 }
 
@@ -532,3 +557,4 @@ export * from "./protocols";
 export * from "./staff";
 export * from "./payments";
 export * from "./clinical";
+export * from "./availability";

@@ -434,3 +434,37 @@ export interface SoapNote {
   createdAt: string;
   updatedAt: string;
 }
+
+
+// ---- Provider availability (working hours + time off) ----
+export interface WorkingHour {
+  dayOfWeek: number;   // 0=Sun .. 6=Sat
+  startMinute: number; // minutes from local midnight
+  endMinute: number;
+}
+
+export interface TimeOff {
+  id: string;
+  startDate: string;   // YYYY-MM-DD
+  endDate: string;     // YYYY-MM-DD (inclusive)
+  allDay: boolean;
+  startMinute: number | null; // when !allDay
+  endMinute: number | null;
+  reason: string | null;
+}
+
+export interface BusyBlock {
+  start: string; // HH:MM local
+  end: string;
+  label: string;
+}
+
+export interface DayAvailability {
+  date: string;
+  dayOfWeek: number;
+  timezone: string;
+  durationMinutes: number;
+  workingWindows: { start: string; end: string }[]; // HH:MM
+  busy: BusyBlock[];
+  openSlots: string[]; // HH:MM start times where the service fits
+}
