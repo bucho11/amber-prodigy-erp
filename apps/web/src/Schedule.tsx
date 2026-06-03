@@ -349,7 +349,7 @@ function BookingForm({
   );
 }
 
-function ClientPicker({
+export function ClientPicker({
   value,
   displayName,
   onPick,

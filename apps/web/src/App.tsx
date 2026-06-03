@@ -7,6 +7,7 @@ import { ServicesAdmin } from "./Services";
 import { Team } from "./Team";
 import { ClientsAdmin } from "./Clients";
 import { ScheduleAdmin } from "./Schedule";
+import { ProtocolsAdmin } from "./Protocols";
 
 export function App() {
   return (
@@ -34,7 +35,7 @@ function Root() {
   return <Shell />;
 }
 
-type Tab = "dashboard" | "schedule" | "clients" | "services" | "team";
+type Tab = "dashboard" | "schedule" | "protocols" | "clients" | "services" | "team";
 
 function Shell() {
   const { user, logout, hasPermission } = useAuth();
@@ -48,6 +49,7 @@ function Shell() {
   // Never render a tab the user can't access (e.g. after a permission change).
   const effectiveTab: Tab =
     (tab === "schedule" && !canSchedule) ||
+    (tab === "protocols" && !canSchedule) ||
     (tab === "clients" && !canClients) ||
     (tab === "services" && !canCatalog) ||
     (tab === "team" && !canTeam)
@@ -66,6 +68,11 @@ function Shell() {
             {canSchedule && (
               <button className={effectiveTab === "schedule" ? "tab active" : "tab"} onClick={() => setTab("schedule")}>
                 Calendar
+              </button>
+            )}
+            {canSchedule && (
+              <button className={effectiveTab === "protocols" ? "tab active" : "tab"} onClick={() => setTab("protocols")}>
+                Protocols
               </button>
             )}
             {canClients && (
@@ -98,6 +105,7 @@ function Shell() {
       <main className="shell">
         {effectiveTab === "dashboard" && <Dashboard />}
         {effectiveTab === "schedule" && <ScheduleAdmin />}
+        {effectiveTab === "protocols" && <ProtocolsAdmin />}
         {effectiveTab === "clients" && <ClientsAdmin />}
         {effectiveTab === "services" && <ServicesAdmin />}
         {effectiveTab === "team" && <Team />}

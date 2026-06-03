@@ -171,3 +171,32 @@ header .link-btn { padding-left: 0; margin-bottom: 4px; }
 .picker-option { display: flex; flex-direction: column; gap: 1px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: #fff; padding: 9px 12px; cursor: pointer; font: inherit; }
 .picker-option:last-child { border-bottom: 0; }
 .picker-option:hover { background: var(--accent-soft); }
+
+/* ---- protocols ---- */
+.subtabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.subtab { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; font-size: 13px; color: var(--muted); }
+.subtab.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-soft); font-weight: 600; }
+.row-actions { margin-bottom: 12px; }
+.plain-list { list-style: none; margin: 0; padding: 0; }
+.list-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.list-row:last-child { border-bottom: 0; }
+.list-row.inactive { opacity: 0.6; }
+.list-row.clickable { cursor: pointer; }
+.list-row.clickable:hover { background: var(--accent-soft); margin: 0 -12px; padding-left: 12px; padding-right: 12px; border-radius: 8px; }
+.list-title { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.list-row-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.chev { color: var(--muted); font-size: 20px; }
+.steps-head { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; font-weight: 600; }
+.steps-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.step-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; padding: 10px; background: var(--bg-soft, #faf7f2); border: 1px solid var(--line); border-radius: 10px; }
+.step-row label { display: flex; flex-direction: column; gap: 2px; }
+.step-row label.grow { flex: 1; min-width: 150px; }
+.step-row input[type="number"] { width: 72px; }
+.step-row input[type="time"] { width: 120px; }
+.step-remove { align-self: center; }
+.preview-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.preview-list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.preview-list li:last-child { border-bottom: 0; }
+.result-ok { font-weight: 600; color: var(--ok); }
+.result-skip { font-weight: 600; color: var(--warn); margin-top: 14px; }
+.detail-meta { margin-bottom: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

@@ -32,6 +32,30 @@ export async function query<T = Record<string, unknown>>(text: string, params?: 
   return res.rows as T[];
 }
 
+/** Run a set of statements in a single transaction. The callback gets a scoped
+ *  query function; the transaction commits on success and rolls back on throw. */
+export async function withTransaction<T>(
+  fn: (q: <R = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<R[]>) => Promise<T>
+): Promise<T> {
+  if (!pool) throw new DbNotConfiguredError();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const scoped = async <R = Record<string, unknown>>(text: string, params?: unknown[]): Promise<R[]> => {
+      const res = await client.query(text, params);
+      return res.rows as R[];
+    };
+    const result = await fn(scoped);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Self-healing schema (brief 7.2): idempotent DDL applied at every boot so the
  * running app converges to the expected schema with no manual migration step.
@@ -235,6 +259,47 @@ async function applySchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_appointments_provider ON appointments(tenant_id, provider_id, starts_at);
     CREATE INDEX IF NOT EXISTS idx_appointments_room ON appointments(tenant_id, room_id, starts_at);
     CREATE INDEX IF NOT EXISTS idx_appointments_client ON appointments(tenant_id, client_id);
+
+    -- Auto-protocol scheduler (the post-surgical "wedge")
+    CREATE TABLE IF NOT EXISTS protocols (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      name        TEXT NOT NULL,
+      description TEXT,
+      is_active   BOOLEAN NOT NULL DEFAULT true,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_protocols_tenant ON protocols(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS protocol_steps (
+      id                 BIGSERIAL PRIMARY KEY,
+      tenant_id          BIGINT NOT NULL REFERENCES tenants(id),
+      protocol_id        BIGINT NOT NULL REFERENCES protocols(id) ON DELETE CASCADE,
+      step_number        INTEGER NOT NULL,
+      day_offset         INTEGER NOT NULL,
+      time_of_day        TEXT,
+      service_variant_id BIGINT NOT NULL REFERENCES service_variants(id),
+      label              TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_protocol_steps_protocol ON protocol_steps(protocol_id);
+
+    CREATE TABLE IF NOT EXISTS protocol_instances (
+      id            BIGSERIAL PRIMARY KEY,
+      tenant_id     BIGINT NOT NULL REFERENCES tenants(id),
+      protocol_id   BIGINT REFERENCES protocols(id),
+      protocol_name TEXT NOT NULL,
+      client_id     BIGINT NOT NULL REFERENCES clients(id),
+      anchor_date   DATE NOT NULL,
+      provider_id   BIGINT NOT NULL REFERENCES staff_profiles(id),
+      room_id       BIGINT REFERENCES rooms(id),
+      status        TEXT NOT NULL DEFAULT 'active',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_protocol_instances_tenant ON protocol_instances(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_protocol_instances_client ON protocol_instances(tenant_id, client_id);
+
+    -- Link generated appointments back to their protocol instance.
+    ALTER TABLE appointments ADD COLUMN IF NOT EXISTS protocol_instance_id BIGINT REFERENCES protocol_instances(id);
   `);
 }
 
@@ -370,3 +435,4 @@ export * from "./catalog";
 export * from "./auth";
 export * from "./clients";
 export * from "./scheduling";
+export * from "./protocols";

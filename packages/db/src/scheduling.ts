@@ -20,6 +20,7 @@ interface AppointmentRow {
   price_cents: number;
   status: string;
   notes: string | null;
+  protocol_instance_id: string | null;
   created_at: string | Date;
 }
 
@@ -32,7 +33,7 @@ const APPT_SELECT = `
          a.room_id::text AS room_id, r.name AS room_name,
          a.service_variant_id::text AS service_variant_id, s.name AS service_name, sv.name AS variant_name,
          (EXTRACT(EPOCH FROM (a.ends_at - a.starts_at)) / 60)::int AS duration_minutes,
-         a.starts_at, a.ends_at, a.price_cents, a.status, a.notes, a.created_at
+         a.starts_at, a.ends_at, a.price_cents, a.status, a.notes, a.protocol_instance_id, a.created_at
   FROM appointments a
   JOIN clients c ON c.id = a.client_id
   JOIN staff_profiles sp ON sp.id = a.provider_id
@@ -58,6 +59,7 @@ function mapAppointment(row: AppointmentRow): Appointment {
     priceCents: row.price_cents,
     status: row.status as AppointmentStatus,
     notes: row.notes,
+    protocolInstanceId: row.protocol_instance_id,
     createdAt: iso(row.created_at),
   };
 }
@@ -165,7 +167,7 @@ export async function findConflict(
 // ---------- queries ----------
 export async function listAppointments(
   tenantId: string,
-  opts: { from?: string; to?: string; providerId?: string; clientId?: string } = {}
+  opts: { from?: string; to?: string; providerId?: string; clientId?: string; protocolInstanceId?: string } = {}
 ): Promise<Appointment[]> {
   const rows = await query<AppointmentRow>(
     `${APPT_SELECT}
@@ -174,8 +176,9 @@ export async function listAppointments(
        AND ($3::timestamptz IS NULL OR a.starts_at < $3)
        AND ($4::bigint IS NULL OR a.provider_id = $4)
        AND ($5::bigint IS NULL OR a.client_id = $5)
+       AND ($6::bigint IS NULL OR a.protocol_instance_id = $6)
      ORDER BY a.starts_at`,
-    [tenantId, opts.from ?? null, opts.to ?? null, opts.providerId ?? null, opts.clientId ?? null]
+    [tenantId, opts.from ?? null, opts.to ?? null, opts.providerId ?? null, opts.clientId ?? null, opts.protocolInstanceId ?? null]
   );
   return rows.map(mapAppointment);
 }
@@ -194,13 +197,14 @@ export interface CreateAppointmentInput {
   endsAt: string;
   priceCents: number;
   notes: string | null;
+  protocolInstanceId?: string | null;
 }
 
 export async function createAppointment(tenantId: string, input: CreateAppointmentInput): Promise<Appointment> {
   const inserted = await query<{ id: string }>(
     `INSERT INTO appointments
-       (tenant_id, client_id, provider_id, room_id, service_variant_id, starts_at, ends_at, price_cents, notes, status)
-     VALUES ($1, $2::bigint, $3::bigint, $4, $5::bigint, $6, $7, $8, $9, 'booked')
+       (tenant_id, client_id, provider_id, room_id, service_variant_id, starts_at, ends_at, price_cents, notes, status, protocol_instance_id)
+     VALUES ($1, $2::bigint, $3::bigint, $4, $5::bigint, $6, $7, $8, $9, 'booked', $10)
      RETURNING id::text AS id`,
     [
       tenantId,
@@ -212,6 +216,7 @@ export async function createAppointment(tenantId: string, input: CreateAppointme
       input.endsAt,
       input.priceCents,
       input.notes,
+      input.protocolInstanceId ?? null,
     ]
   );
   const appt = await getAppointment(tenantId, inserted[0].id);

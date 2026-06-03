@@ -242,5 +242,66 @@ export interface Appointment {
   priceCents: number;
   status: AppointmentStatus;
   notes: string | null;
+  protocolInstanceId: string | null;
   createdAt: string;
+}
+
+// ---- Auto-protocol scheduler ----
+export interface ProtocolStep {
+  id?: string;
+  stepNumber: number;
+  dayOffset: number;          // days from the anchor date (e.g. procedure date = 0)
+  timeOfDay: string | null;   // 'HH:MM' local; null = use the apply-time default
+  serviceVariantId: string;
+  serviceName?: string;
+  variantName?: string;
+  durationMinutes?: number;
+  priceCents?: number;
+  label: string | null;
+}
+
+export interface Protocol {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  steps: ProtocolStep[];
+  createdAt: string;
+}
+
+export interface ProtocolListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  stepCount: number;
+  spanDays: number;           // last dayOffset - first dayOffset
+}
+
+export interface ProtocolInstance {
+  id: string;
+  protocolId: string | null;
+  protocolName: string;
+  clientId: string;
+  clientName: string;
+  anchorDate: string;         // YYYY-MM-DD
+  providerId: string;
+  providerName: string;
+  roomId: string | null;
+  roomName: string | null;
+  status: string;             // active | completed | cancelled
+  createdAt: string;
+  appointmentCount?: number;
+}
+
+export interface ApplyProtocolSkip {
+  stepNumber: number;
+  dayOffset: number;
+  reason: string;
+}
+
+export interface ApplyProtocolResult {
+  instance: ProtocolInstance;
+  created: Appointment[];
+  skipped: ApplyProtocolSkip[];
 }

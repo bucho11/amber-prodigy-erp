@@ -24,6 +24,7 @@ import { requireAuth, requirePermission, tenantOf } from "./security";
 import { registerAuthRoutes } from "./routes-auth";
 import { registerClientRoutes } from "./routes-clients";
 import { registerSchedulingRoutes } from "./routes-scheduling";
+import { registerProtocolRoutes } from "./routes-protocols";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -76,6 +77,9 @@ registerClientRoutes(api);
 
 // Scheduling routes.
 registerSchedulingRoutes(api);
+
+// Auto-protocol scheduler routes.
+registerProtocolRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
