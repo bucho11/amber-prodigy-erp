@@ -2,3 +2,31 @@
 # in Replit's Deploy UI — intended: build = "npm install && npm run build", run = "npm run start".
 # We'll confirm those in the UI when connecting, since Replit's deploy config shifts.
 run = "npm install && npm run dev"
+modules = ["nodejs-20"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install && PORT=5000 npm run dev"
+waitForPort = 5000
+
+[nix]
+channel = "stable-25_05"
