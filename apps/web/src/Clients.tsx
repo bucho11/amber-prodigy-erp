@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Client, ClientListItem, Tag } from "@prodigy/contracts";
 import { api } from "./api";
 import { useAuth } from "./auth";
+import { ClinicalSection } from "./Clinical";
 
 type View = { mode: "list" } | { mode: "edit"; id: string } | { mode: "new" };
 
@@ -369,13 +370,15 @@ function ClientEditor({
         <textarea
           className="input"
           rows={3}
-          placeholder="Notes & preferences (not clinical) — e.g. prefers a warmer room, books with Keshia"
+          placeholder="Notes & preferences (not clinical) — e.g. prefers a warmer room, always books the late slot"
           value={form.notes}
           onChange={set("notes")}
           disabled={ro}
           style={{ marginTop: 4 }}
         />
       </section>
+
+      {!isNew && clientId && <ClinicalSection clientId={clientId} />}
 
       {err && <p className="bad small">{err}</p>}
 

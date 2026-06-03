@@ -356,6 +356,43 @@ async function applySchema(): Promise<void> {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+
+    -- Clinical records (slice 9). Access is permission-gated (clinical.view / clinical.manage).
+    CREATE TABLE IF NOT EXISTS client_intake (
+      client_id           BIGINT PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      tenant_id           BIGINT NOT NULL REFERENCES tenants(id),
+      reason_for_visit    TEXT,
+      medical_conditions  TEXT,
+      medications         TEXT,
+      allergies           TEXT,
+      surgeries           TEXT,
+      injuries            TEXT,
+      pregnant            BOOLEAN,
+      pressure_preference TEXT,
+      areas_to_avoid      TEXT,
+      notes               TEXT,
+      consent_to_treat    BOOLEAN NOT NULL DEFAULT false,
+      signature_name      TEXT,
+      signed_at           TIMESTAMPTZ,
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_intake_tenant ON client_intake(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS soap_notes (
+      id             BIGSERIAL PRIMARY KEY,
+      tenant_id      BIGINT NOT NULL REFERENCES tenants(id),
+      client_id      BIGINT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      appointment_id BIGINT REFERENCES appointments(id),
+      provider_id    BIGINT REFERENCES staff_profiles(id),
+      note_date      DATE NOT NULL,
+      subjective     TEXT,
+      objective      TEXT,
+      assessment     TEXT,
+      plan           TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_soap_client ON soap_notes(tenant_id, client_id, note_date DESC);
   `);
 }
 
@@ -494,3 +531,4 @@ export * from "./scheduling";
 export * from "./protocols";
 export * from "./staff";
 export * from "./payments";
+export * from "./clinical";

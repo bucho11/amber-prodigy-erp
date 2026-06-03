@@ -390,3 +390,47 @@ export interface PaymentsConfig {
   taxRateBps: number;
   methods: PaymentMethod[]; // payment methods currently available to take
 }
+
+
+// ---- Clinical records (intake + SOAP notes) ----
+export interface ClientIntake {
+  clientId: string;
+  reasonForVisit: string | null;
+  medicalConditions: string | null;
+  medications: string | null;
+  allergies: string | null;
+  surgeries: string | null;
+  injuries: string | null;
+  pregnant: boolean | null;
+  pressurePreference: string | null;
+  areasToAvoid: string | null;
+  notes: string | null;
+  consentToTreat: boolean;
+  signatureName: string | null;
+  signedAt: string | null;
+  hasIntake: boolean;   // false if no intake has been recorded yet
+  updatedAt: string | null;
+}
+
+export interface SoapNoteListItem {
+  id: string;
+  date: string;
+  providerName: string | null;
+  appointmentId: string | null;
+  createdAt: string;
+}
+
+export interface SoapNote {
+  id: string;
+  clientId: string;
+  appointmentId: string | null;
+  providerId: string | null;
+  providerName: string | null;
+  date: string;
+  subjective: string | null;
+  objective: string | null;
+  assessment: string | null;
+  plan: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

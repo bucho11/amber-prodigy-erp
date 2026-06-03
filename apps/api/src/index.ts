@@ -27,6 +27,7 @@ import { registerSchedulingRoutes } from "./routes-scheduling";
 import { registerProtocolRoutes } from "./routes-protocols";
 import { registerStaffRoutes } from "./routes-staff";
 import { registerPaymentRoutes } from "./routes-payments";
+import { registerClinicalRoutes } from "./routes-clinical";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -88,6 +89,9 @@ registerStaffRoutes(api);
 
 // Payments / POS routes.
 registerPaymentRoutes(api);
+
+// Clinical records routes.
+registerClinicalRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
