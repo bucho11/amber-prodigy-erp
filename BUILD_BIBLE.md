@@ -69,6 +69,8 @@ persistence + the seeded tenant on the next Publish.
 
 - 2026-06-03 — **Scheduling (slice 5)**: appointments store UTC timestamps; `ends_at` is persisted (duration = ends−starts, robust to later variant edits) and `price_cents` is snapshotted at booking. Conflict = time-overlap (`starts < other.ends AND ends > other.starts`, strict so adjacent slots are fine) on the same provider, and on the same room when one is set; ignores `cancelled`/`no_show`. Status enum: booked / completed / cancelled / no_show. v1 time UX is browser-local (Amber operates in the tenant tz, Pacific); booking in tenant-tz regardless of the user's location is a later refinement. No provider working-hours yet, so open-slot availability is the next scheduling enhancement.
 
+- 2026-06-03 — **Staff seed = Amber only.** Removed the early placeholder 'Keshia' from the concept per owner: staff seed now seeds just Amber, plus a one-time FK-safe cleanup that deletes a previously-seeded Keshia from existing tenants (skips if she's referenced by an appointment). Prodigy has a team but names are kept generic for now; real staff get added later (staff-ops slice).
+
 ## 8. Build sequence (Phase 1)
 - Slice 1 (SHIPPED): monorepo + API + DB self-heal + seed tenant #1 + status page + deploy loop.
 - Slice 2 (SHIPPED): editable service catalog & resources (categories/services/variants/rooms); tenant-scoped CRUD; seeded massage menu ($125/$185/$245); Dashboard + Services & Rooms UI.

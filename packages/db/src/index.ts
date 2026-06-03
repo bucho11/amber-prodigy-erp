@@ -279,11 +279,19 @@ async function seedTenantOne(): Promise<void> {
   await pool.query(
     `INSERT INTO staff_profiles (tenant_id, display_name, title)
      SELECT $1::bigint, v.name, v.title
-     FROM (VALUES ('Amber', 'Owner / Massage Therapist'),
-                  ('Keshia', 'Esthetician')) AS v(name, title)
+     FROM (VALUES ('Amber', 'Owner / Massage Therapist')) AS v(name, title)
      WHERE NOT EXISTS (
        SELECT 1 FROM staff_profiles s WHERE s.tenant_id = $1::bigint AND s.display_name = v.name
      )`,
+    [tenantId]
+  );
+
+  // One-time cleanup: remove the early placeholder 'Keshia' staff profile from existing
+  // databases (FK-safe: skips if any appointment references it).
+  await pool.query(
+    `DELETE FROM staff_profiles
+     WHERE tenant_id = $1::bigint AND display_name = 'Keshia' AND title = 'Esthetician'
+       AND NOT EXISTS (SELECT 1 FROM appointments a WHERE a.provider_id = staff_profiles.id)`,
     [tenantId]
   );
 
