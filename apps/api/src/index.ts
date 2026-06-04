@@ -36,6 +36,7 @@ import { registerInventoryRoutes } from "./routes-inventory";
 import { registerReportRoutes } from "./routes-reports";
 import { registerMembershipRoutes } from "./routes-memberships";
 import { registerPublicRoutes } from "./routes-public";
+import { registerAuditRoutes } from "./routes-audit";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -124,6 +125,9 @@ registerMembershipRoutes(api);
 
 // Public (unauthenticated) online-booking routes.
 registerPublicRoutes(api);
+
+// Clinical-access audit log routes.
+registerAuditRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(

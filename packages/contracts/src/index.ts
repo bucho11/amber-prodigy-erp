@@ -686,3 +686,18 @@ export interface MembershipInvoice {
   paidAt: string | null;
   createdAt: string;
 }
+
+
+// ---- Clinical-access audit log ----
+export type AuditAction = "view" | "create" | "update";
+export interface AuditEntry {
+  id: string;
+  actorName: string;
+  action: AuditAction;
+  resourceType: string;
+  resourceId: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  detail: string | null;
+  createdAt: string;
+}

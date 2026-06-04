@@ -32,7 +32,7 @@
 
 ## 2. Definition of DONE — current phase
 - **Current phase: UNDEFINED** — awaiting the user's pick of the next line item (see §5). Last
-  shipped: Slice 18 (client-facing online booking).
+  shipped: Slice 19 (clinical-access audit log).
 - **Standing per-slice completion bar** (every slice must clear all of these): schema +
   contracts + db module + routes + wiring → typecheck + build green → a live DB test suite
   passing → `BUILD_BIBLE.md` + this file updated → committed + pushed to `main` → plain-language
@@ -40,7 +40,7 @@
 
 ## 3. Built & verified
 *(Verified 2026-06-03; typecheck + build PASS; live test suites green; working tree clean.
-Proof = the files named; all 18 slices are committed to origin/main. The live commit hash is
+Proof = the files named; all 19 slices are committed to origin/main. The live commit hash is
 shown in each reply's BUILD STATUS header.)*
 1. Foundation — monorepo, self-healing Postgres, deploy loop. `packages/db/src/index.ts`
 2. Auth + owner-configurable RBAC. `db/auth.ts`, `api/routes-auth.ts`, `api/security.ts`
@@ -73,17 +73,20 @@ shown in each reply's BUILD STATUS header.)*
     endpoints (tenant by slug): services/providers, open slots, instant-book reusing the
     availability + double-booking guards, match-or-create client by email. No email/CAPTCHA yet.
     `db/booking.ts`, `api/routes-public.ts`, `web/PublicBooking.tsx`
+19. Clinical-access audit log — tamper-evident hash chain; records who viewed/edited intake +
+    SOAP (actor + client); verify-integrity endpoint; read gated settings.manage.
+    `db/audit.ts`, `api/routes-audit.ts`, `web/Audit.tsx`
 
 ## 4. Current position
 Tree clean, 0 ahead of origin, typecheck + build green. Nothing in progress. Ready to begin the
 next phase once the user names it.
 
 ## 5. Ordered path to completion (candidates — user picks order)
-1. Clinical-access audit log (fully internal).
-2. Marketing — appointment reminders / campaigns; needs Twilio / A2P 10DLC.
-3. Embedded payroll — Gusto / Check; external.
-4. Online-booking enhancements — "any available" provider, cancel/reschedule links,
+1. Marketing — appointment reminders / campaigns; needs Twilio / A2P 10DLC.
+2. Embedded payroll — Gusto / Check; external.
+3. Online-booking enhancements — "any available" provider, cancel/reschedule links,
    confirmation email/SMS (Twilio gate), deposits (Stripe gate).
+4. Extend the audit log to other sensitive areas (client PII, financials).
 - **Gated on owner/external setup:** Stripe go-live, Twilio, payroll, formal HIPAA/BAA, electronic insurance billing.
 
 ## 6. PROPOSALS backlog (ideas awaiting the user's call)
@@ -98,5 +101,7 @@ next phase once the user names it.
 - The public /book page has no CAPTCHA / rate-limiting (spam protection needs infra) and sends no
   confirmation email/SMS yet (the email/Twilio gate); confirmations are on-screen and bookings appear
   on the internal calendar immediately.
+- The clinical-access audit log records best-effort (an audit write failure won't block a clinical
+  read/write); regulatory-grade guaranteed logging would make it transactional with the operation.
 - Clinical = HIPAA-grade safeguards, NOT formal HIPAA / BAA; no electronic insurance billing.
 - Availability open-slots is advisory; the only hard double-booking guard is at booking time.

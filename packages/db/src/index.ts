@@ -588,6 +588,25 @@ async function applySchema(): Promise<void> {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS idx_membership_invoices ON membership_invoices(tenant_id, membership_id);
+
+    -- Tamper-evident clinical-access audit log (slice 19). Each row chains to the prior via a hash.
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id            BIGSERIAL PRIMARY KEY,
+      tenant_id     BIGINT NOT NULL REFERENCES tenants(id),
+      actor_user_id BIGINT,
+      actor_name    TEXT NOT NULL,
+      action        TEXT NOT NULL,        -- view | create | update
+      resource_type TEXT NOT NULL,        -- intake | soap | soap_list | clinical
+      resource_id   TEXT,
+      client_id     BIGINT,
+      detail        TEXT,
+      entry_ts      TEXT NOT NULL,        -- exact ISO timestamp folded into the hash
+      prev_hash     TEXT NOT NULL,
+      hash          TEXT NOT NULL,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_log ON audit_log(tenant_id, id);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_client ON audit_log(tenant_id, client_id);
   `);
 }
 
@@ -762,3 +781,4 @@ export * from "./inventory";
 export * from "./reports";
 export * from "./memberships";
 export * from "./booking";
+export * from "./audit";

@@ -1,4 +1,4 @@
-import type { Router } from "express";
+import type { Request, Router } from "express";
 import {
   getIntake,
   upsertIntake,
@@ -9,12 +9,23 @@ import {
   appointmentBelongsToClient,
   clientExists,
   getStaff,
+  recordAudit,
 } from "@prodigy/db";
-import type { UpdateSoapPatch } from "@prodigy/db";
+import type { UpdateSoapPatch, AuditInput } from "@prodigy/db";
 import { ValidationError, reqString, optString, wrap } from "./http";
 import { requireAuth, requirePermission, userOf } from "./security";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Best-effort clinical-access audit (never blocks the clinical operation).
+async function audit(req: Request, input: AuditInput): Promise<void> {
+  try {
+    const u = userOf(req);
+    await recordAudit(u.tenantId, { id: u.id, displayName: u.displayName }, input);
+  } catch (err) {
+    console.error("[audit] failed to record", err);
+  }
+}
 
 export function registerClinicalRoutes(api: Router): void {
   // ---- intake ----
@@ -28,7 +39,9 @@ export function registerClinicalRoutes(api: Router): void {
         res.status(404).json({ error: "Client not found." });
         return;
       }
-      res.json({ intake: await getIntake(tid, req.params.id) });
+      const intake = await getIntake(tid, req.params.id);
+      await audit(req, { action: "view", resourceType: "intake", clientId: req.params.id });
+      res.json({ intake });
     })
   );
 
@@ -58,6 +71,7 @@ export function registerClinicalRoutes(api: Router): void {
         consentToTreat: Boolean(b.consentToTreat),
         signatureName: optString(b.signatureName) ?? null,
       });
+      await audit(req, { action: "update", resourceType: "intake", clientId: req.params.id, detail: "Saved intake" });
       res.json({ intake });
     })
   );
@@ -73,7 +87,9 @@ export function registerClinicalRoutes(api: Router): void {
         res.status(404).json({ error: "Client not found." });
         return;
       }
-      res.json({ notes: await listSoapNotes(tid, req.params.id) });
+      const notes = await listSoapNotes(tid, req.params.id);
+      await audit(req, { action: "view", resourceType: "soap_list", clientId: req.params.id });
+      res.json({ notes });
     })
   );
 
@@ -106,6 +122,7 @@ export function registerClinicalRoutes(api: Router): void {
         assessment: optString(b.assessment) ?? null,
         plan: optString(b.plan) ?? null,
       });
+      await audit(req, { action: "create", resourceType: "soap", resourceId: note.id, clientId });
       res.status(201).json({ note });
     })
   );
@@ -120,6 +137,7 @@ export function registerClinicalRoutes(api: Router): void {
         res.status(404).json({ error: "Note not found." });
         return;
       }
+      await audit(req, { action: "view", resourceType: "soap", resourceId: n.id, clientId: n.clientId });
       res.json({ note: n });
     })
   );
@@ -157,7 +175,9 @@ export function registerClinicalRoutes(api: Router): void {
       if ("objective" in b) patch.objective = optString(b.objective) ?? null;
       if ("assessment" in b) patch.assessment = optString(b.assessment) ?? null;
       if ("plan" in b) patch.plan = optString(b.plan) ?? null;
-      res.json({ note: await updateSoapNote(tid, req.params.id, patch) });
+      const note = await updateSoapNote(tid, req.params.id, patch);
+      await audit(req, { action: "update", resourceType: "soap", resourceId: req.params.id, clientId: existing.clientId });
+      res.json({ note });
     })
   );
 }
