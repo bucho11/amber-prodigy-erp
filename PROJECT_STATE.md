@@ -32,7 +32,7 @@
 
 ## 2. Definition of DONE — current phase
 - **Current phase: UNDEFINED** — awaiting the user's pick of the next line item (see §5). Last
-  shipped: Slice 17 (recurring memberships).
+  shipped: Slice 18 (client-facing online booking).
 - **Standing per-slice completion bar** (every slice must clear all of these): schema +
   contracts + db module + routes + wiring → typecheck + build green → a live DB test suite
   passing → `BUILD_BIBLE.md` + this file updated → committed + pushed to `main` → plain-language
@@ -40,7 +40,7 @@
 
 ## 3. Built & verified
 *(Verified 2026-06-03; typecheck + build PASS; live test suites green; working tree clean.
-Proof = the files named; all 17 slices are committed to origin/main. The live commit hash is
+Proof = the files named; all 18 slices are committed to origin/main. The live commit hash is
 shown in each reply's BUILD STATUS header.)*
 1. Foundation — monorepo, self-healing Postgres, deploy loop. `packages/db/src/index.ts`
 2. Auth + owner-configurable RBAC. `db/auth.ts`, `api/routes-auth.ts`, `api/security.ts`
@@ -69,16 +69,21 @@ shown in each reply's BUILD STATUS header.)*
 17. Recurring memberships — plans, subscriptions (pause/resume/cancel), dues billing run,
     manual dues payment → books (Membership Revenue 4100), member discount at checkout; card
     auto-charge gated. `db/memberships.ts`, `api/routes-memberships.ts`, `web/Memberships.tsx`
+18. Client-facing online booking — first PUBLIC surface (no auth). `/book` page + `/public/*`
+    endpoints (tenant by slug): services/providers, open slots, instant-book reusing the
+    availability + double-booking guards, match-or-create client by email. No email/CAPTCHA yet.
+    `db/booking.ts`, `api/routes-public.ts`, `web/PublicBooking.tsx`
 
 ## 4. Current position
 Tree clean, 0 ahead of origin, typecheck + build green. Nothing in progress. Ready to begin the
 next phase once the user names it.
 
 ## 5. Ordered path to completion (candidates — user picks order)
-1. Client-facing microsite / online booking (engine exists; needs a public surface).
-2. Clinical-access audit log (fully internal).
-3. Marketing — appointment reminders / campaigns; needs Twilio / A2P 10DLC.
-4. Embedded payroll — Gusto / Check; external.
+1. Clinical-access audit log (fully internal).
+2. Marketing — appointment reminders / campaigns; needs Twilio / A2P 10DLC.
+3. Embedded payroll — Gusto / Check; external.
+4. Online-booking enhancements — "any available" provider, cancel/reschedule links,
+   confirmation email/SMS (Twilio gate), deposits (Stripe gate).
 - **Gated on owner/external setup:** Stripe go-live, Twilio, payroll, formal HIPAA/BAA, electronic insurance billing.
 
 ## 6. PROPOSALS backlog (ideas awaiting the user's call)
@@ -90,5 +95,8 @@ next phase once the user names it.
   (not FIFO/layers) and assumes stock is paid for on receipt. Useful bookkeeping, not a CPA substitute.
 - Stripe / Twilio paths are wired but never live-tested (sandbox cannot reach them). Recurring
   membership card auto-charge is not built at all (manual/cash dues only); it's gated like card payments.
+- The public /book page has no CAPTCHA / rate-limiting (spam protection needs infra) and sends no
+  confirmation email/SMS yet (the email/Twilio gate); confirmations are on-screen and bookings appear
+  on the internal calendar immediately.
 - Clinical = HIPAA-grade safeguards, NOT formal HIPAA / BAA; no electronic insurance billing.
 - Availability open-slots is advisory; the only hard double-booking guard is at booking time.

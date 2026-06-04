@@ -35,6 +35,7 @@ import { registerLedgerRoutes } from "./routes-ledger";
 import { registerInventoryRoutes } from "./routes-inventory";
 import { registerReportRoutes } from "./routes-reports";
 import { registerMembershipRoutes } from "./routes-memberships";
+import { registerPublicRoutes } from "./routes-public";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -120,6 +121,9 @@ registerReportRoutes(api);
 
 // Membership routes.
 registerMembershipRoutes(api);
+
+// Public (unauthenticated) online-booking routes.
+registerPublicRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
@@ -322,6 +326,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
       return;
     }
     if (err.name === "MembershipError") {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err.name === "BookingError") {
       res.status(400).json({ error: err.message });
       return;
     }

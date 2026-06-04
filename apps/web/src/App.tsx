@@ -13,6 +13,7 @@ import { BooksPage } from "./Books";
 import { InventoryPage } from "./Inventory";
 import { ReportsPage } from "./Reports";
 import { MembershipsPage } from "./Memberships";
+import { PublicBooking } from "./PublicBooking";
 
 export function App() {
   return (
@@ -28,6 +29,10 @@ function Root() {
   // Invite acceptance is reachable without being signed in.
   if (typeof window !== "undefined" && window.location.pathname === "/accept-invite") {
     return <AcceptInvite />;
+  }
+  // The client-facing booking page is fully public.
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/book")) {
+    return <PublicBooking />;
   }
   if (loading) {
     return (
