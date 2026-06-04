@@ -11,6 +11,7 @@ import { ProtocolsAdmin } from "./Protocols";
 import { CheckoutPage } from "./Checkout";
 import { BooksPage } from "./Books";
 import { InventoryPage } from "./Inventory";
+import { ReportsPage } from "./Reports";
 
 export function App() {
   return (
@@ -38,7 +39,7 @@ function Root() {
   return <Shell />;
 }
 
-type Tab = "dashboard" | "schedule" | "protocols" | "clients" | "checkout" | "books" | "inventory" | "services" | "team";
+type Tab = "dashboard" | "schedule" | "protocols" | "clients" | "checkout" | "books" | "inventory" | "reports" | "services" | "team";
 
 function Shell() {
   const { user, logout, hasPermission } = useAuth();
@@ -51,6 +52,7 @@ function Shell() {
   const canCheckout = hasPermission("pos.operate") || hasPermission("financials.view") || hasPermission("settings.manage");
   const canBooks = hasPermission("financials.view") || hasPermission("books.manage");
   const canInventory = hasPermission("inventory.view") || hasPermission("inventory.manage");
+  const canReports = hasPermission("reports.view");
 
   // Never render a tab the user can't access (e.g. after a permission change).
   const effectiveTab: Tab =
@@ -60,6 +62,7 @@ function Shell() {
     (tab === "checkout" && !canCheckout) ||
     (tab === "books" && !canBooks) ||
     (tab === "inventory" && !canInventory) ||
+    (tab === "reports" && !canReports) ||
     (tab === "services" && !canCatalog) ||
     (tab === "team" && !canTeam)
       ? "dashboard"
@@ -104,6 +107,11 @@ function Shell() {
                 Inventory
               </button>
             )}
+            {canReports && (
+              <button className={effectiveTab === "reports" ? "tab active" : "tab"} onClick={() => setTab("reports")}>
+                Reports
+              </button>
+            )}
             {canCatalog && (
               <button className={effectiveTab === "services" ? "tab active" : "tab"} onClick={() => setTab("services")}>
                 Services &amp; Rooms
@@ -134,6 +142,7 @@ function Shell() {
         {effectiveTab === "checkout" && <CheckoutPage />}
         {effectiveTab === "books" && <BooksPage />}
         {effectiveTab === "inventory" && <InventoryPage />}
+        {effectiveTab === "reports" && <ReportsPage />}
         {effectiveTab === "services" && <ServicesAdmin />}
         {effectiveTab === "team" && <Team />}
       </main>

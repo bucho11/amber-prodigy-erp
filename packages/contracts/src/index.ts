@@ -598,3 +598,53 @@ export interface ProductTxn {
   note: string | null;
   createdAt: string;
 }
+
+
+// ---- Reports ----
+export interface PaymentMethodTotal {
+  method: PaymentMethod | string;
+  amountCents: number;
+  count: number;
+}
+export interface SalesSummary {
+  from: string;
+  to: string;
+  paidOrderCount: number;
+  subtotalCents: number;     // line totals before discount/tax
+  discountCents: number;
+  netSalesCents: number;     // subtotal - discount (recognized revenue)
+  taxCents: number;
+  tipCents: number;
+  totalCollectedCents: number; // what customers paid (incl. tax + tip)
+  refundCount: number;
+  refundedCents: number;
+  paymentsByMethod: PaymentMethodTotal[];
+}
+export interface IncomeLine {
+  code: string;
+  name: string;
+  amountCents: number;
+}
+export interface IncomeSummary {
+  from: string;
+  to: string;
+  revenueCents: number;
+  expenseCents: number;
+  netIncomeCents: number;
+  revenue: IncomeLine[];
+  expenses: IncomeLine[];
+}
+export interface LowStockItem {
+  id: string;
+  name: string;
+  stockQty: number;
+  reorderPoint: number;
+}
+export interface InventorySnapshot {
+  productCount: number;
+  trackedProductCount: number;
+  inventoryValueCents: number; // stock at cost
+  retailValueCents: number;    // stock at price
+  outOfStockCount: number;
+  lowStock: LowStockItem[];
+}

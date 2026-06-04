@@ -33,6 +33,7 @@ import { registerGiftCardRoutes } from "./routes-giftcards";
 import { registerPackageRoutes } from "./routes-packages";
 import { registerLedgerRoutes } from "./routes-ledger";
 import { registerInventoryRoutes } from "./routes-inventory";
+import { registerReportRoutes } from "./routes-reports";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -112,6 +113,9 @@ registerLedgerRoutes(api);
 
 // Inventory routes.
 registerInventoryRoutes(api);
+
+// Reports routes.
+registerReportRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(

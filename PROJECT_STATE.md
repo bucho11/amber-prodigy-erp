@@ -32,15 +32,16 @@
 
 ## 2. Definition of DONE — current phase
 - **Current phase: UNDEFINED** — awaiting the user's pick of the next line item (see §5). Last
-  shipped: Slice 14 (inventory).
+  shipped: Slice 15 (reporting).
 - **Standing per-slice completion bar** (every slice must clear all of these): schema +
   contracts + db module + routes + wiring → typecheck + build green → a live DB test suite
   passing → `BUILD_BIBLE.md` + this file updated → committed + pushed to `main` → plain-language
   report to the user.
 
 ## 3. Built & verified
-*(Verified 2026-06-03 against origin/main @ `734ee19`; typecheck + build PASS; working tree
-clean, 0 ahead of origin. Proof = the files named; all 14 slices are committed.)*
+*(Verified 2026-06-03; typecheck + build PASS; live test suites green; working tree clean.
+Proof = the files named; all 15 slices are committed to origin/main. The live commit hash is
+shown in each reply's BUILD STATUS header.)*
 1. Foundation — monorepo, self-healing Postgres, deploy loop. `packages/db/src/index.ts`
 2. Auth + owner-configurable RBAC. `db/auth.ts`, `api/routes-auth.ts`, `api/security.ts`
 3. Editable service catalog + rooms. `db/catalog.ts`, `web/Services.tsx`
@@ -60,19 +61,20 @@ clean, 0 ahead of origin. Proof = the files named; all 14 slices are committed.)
     gift-card issuance, package sale. `db/ledger.ts`, `api/routes-ledger.ts`, `web/Books.tsx`
 14. Inventory — products + stock; decrement at settlement, restore on refund; receive/adjust/
     count; low-stock flagging. `db/inventory.ts`, `api/routes-inventory.ts`, `web/Inventory.tsx`
+15. Reporting — read-only sales summary, ledger income summary, inventory snapshot; date-ranged;
+    gated `reports.view`. `db/reports.ts`, `api/routes-reports.ts`, `web/Reports.tsx`
 
 ## 4. Current position
 Tree clean, 0 ahead of origin, typecheck + build green. Nothing in progress. Ready to begin the
 next phase once the user names it.
 
 ## 5. Ordered path to completion (candidates — user picks order)
-1. **Reporting** — dashboards / summaries over sales, books, and stock. No external dependency. *(recommended next)*
-2. Recurring memberships — subscriptions; billing sits behind the connect-Stripe gate.
-3. Marketing — appointment reminders / campaigns; needs Twilio / A2P 10DLC.
-4. Embedded payroll — Gusto / Check; external.
-5. Client-facing microsite / online booking.
-6. Clinical-access audit log.
-7. Inventory → GL (COGS / inventory-asset posting).
+1. Recurring memberships — subscriptions; billing sits behind the connect-Stripe gate. *(recommended next)*
+2. Marketing — appointment reminders / campaigns; needs Twilio / A2P 10DLC.
+3. Embedded payroll — Gusto / Check; external.
+4. Client-facing microsite / online booking.
+5. Clinical-access audit log.
+6. Inventory → GL (COGS / inventory-asset posting).
 - **Gated on owner/external setup:** Stripe go-live, Twilio, payroll, formal HIPAA/BAA, electronic insurance billing.
 
 ## 6. PROPOSALS backlog (ideas awaiting the user's call)
