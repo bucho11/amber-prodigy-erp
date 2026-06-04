@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { query } from "./index";
 import { findConflict, getVariantForBooking, createAppointment } from "./scheduling";
 import { computeAvailability } from "./availability";
@@ -32,6 +33,16 @@ export interface BookingConfirmation {
   endsAt: string;
   serviceName: string;
   providerName: string;
+  manageToken: string;
+}
+
+export interface ManagedBooking {
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  serviceName: string;
+  providerName: string;
+  canModify: boolean;
 }
 
 export interface PublicBookInput {
@@ -123,12 +134,100 @@ export async function publicBook(tenantId: string, timeZone: string, input: Publ
     notes: "Booked online",
     protocolInstanceId: null,
   });
+  const manageToken = randomBytes(24).toString("base64url");
+  await query(`UPDATE appointments SET manage_token = $3 WHERE tenant_id = $1 AND id = $2`, [tenantId, appt.id, manageToken]);
   return {
     startsAt: appt.startsAt,
     endsAt: appt.endsAt,
     serviceName: `${variant.serviceName} — ${variant.variantName}`,
     providerName: pname,
+    manageToken,
   };
+}
+
+// ---------- self-serve manage / cancel / reschedule (token-based) ----------
+interface TokenRow {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+  service_variant_id: string;
+  provider_id: string;
+  service_name: string;
+  variant_name: string;
+  provider_name: string | null;
+  duration_minutes: number;
+}
+
+async function loadByToken(tenantId: string, token: string): Promise<TokenRow | null> {
+  if (!token) return null;
+  const rows = await query<TokenRow>(
+    `SELECT a.id::text AS id, a.starts_at, a.ends_at, a.status,
+            a.service_variant_id::text AS service_variant_id, a.provider_id::text AS provider_id,
+            s.name AS service_name, sv.name AS variant_name, sv.duration_minutes AS duration_minutes,
+            sp.display_name AS provider_name
+     FROM appointments a
+     JOIN service_variants sv ON sv.id = a.service_variant_id
+     JOIN services s ON s.id = sv.service_id
+     LEFT JOIN staff_profiles sp ON sp.id = a.provider_id
+     WHERE a.tenant_id = $1 AND a.manage_token = $2 LIMIT 1`,
+    [tenantId, token]
+  );
+  return rows[0] ?? null;
+}
+
+function viewOf(r: TokenRow): ManagedBooking {
+  const startsAt = new Date(r.starts_at).toISOString();
+  return {
+    startsAt,
+    endsAt: new Date(r.ends_at).toISOString(),
+    status: r.status,
+    serviceName: `${r.service_name} — ${r.variant_name}`,
+    providerName: r.provider_name ?? "",
+    canModify: r.status === "booked" && new Date(startsAt).getTime() > Date.now(),
+  };
+}
+
+export async function getBookingByToken(tenantId: string, token: string): Promise<ManagedBooking> {
+  const r = await loadByToken(tenantId, token);
+  if (!r) throw new BookingError("We couldn't find that booking.");
+  return viewOf(r);
+}
+
+export async function cancelBooking(tenantId: string, token: string): Promise<ManagedBooking> {
+  const r = await loadByToken(tenantId, token);
+  if (!r) throw new BookingError("We couldn't find that booking.");
+  if (r.status !== "booked") throw new BookingError("This booking can't be cancelled.");
+  if (new Date(r.starts_at).getTime() <= Date.now()) throw new BookingError("This appointment has passed — please call us.");
+  await query(`UPDATE appointments SET status = 'cancelled' WHERE tenant_id = $1 AND id = $2`, [tenantId, r.id]);
+  const updated = await loadByToken(tenantId, token);
+  return viewOf(updated!);
+}
+
+export async function rescheduleSlots(tenantId: string, timeZone: string, token: string, date: string): Promise<PublicSlot[]> {
+  const r = await loadByToken(tenantId, token);
+  if (!r) throw new BookingError("We couldn't find that booking.");
+  const avail = await computeAvailability(tenantId, r.provider_id, date, r.duration_minutes, timeZone, 15, r.id);
+  return avail.openSlots.map((t) => ({ startsAt: zonedWallTimeToUtc(date, t, timeZone), label: t }));
+}
+
+export async function rescheduleBooking(tenantId: string, timeZone: string, token: string, newStartsAt: string): Promise<ManagedBooking> {
+  const r = await loadByToken(tenantId, token);
+  if (!r) throw new BookingError("We couldn't find that booking.");
+  if (r.status !== "booked") throw new BookingError("This booking can't be changed.");
+  if (new Date(r.starts_at).getTime() <= Date.now()) throw new BookingError("This appointment has passed — please call us.");
+  const start = new Date(newStartsAt);
+  if (isNaN(start.getTime())) throw new BookingError("That time is invalid.");
+  const startsAt = start.toISOString();
+  const endsAt = new Date(start.getTime() + r.duration_minutes * 60000).toISOString();
+  const parts = utcToZonedParts(startsAt, timeZone);
+  const avail = await computeAvailability(tenantId, r.provider_id, parts.date, r.duration_minutes, timeZone, 15, r.id);
+  if (!avail.openSlots.includes(hhmm(parts.minutes))) throw new BookingError("That time isn't available anymore. Please pick another.");
+  const conflict = await findConflict(tenantId, { providerId: r.provider_id, roomId: null, startsAt, endsAt, excludeId: r.id });
+  if (conflict) throw new BookingError("That time was just taken. Please pick another.");
+  await query(`UPDATE appointments SET starts_at = $3, ends_at = $4 WHERE tenant_id = $1 AND id = $2`, [tenantId, r.id, startsAt, endsAt]);
+  const updated = await loadByToken(tenantId, token);
+  return viewOf(updated!);
 }
 
 /** Match an existing client by email, or create a new one. Never reveals whether the client existed. */

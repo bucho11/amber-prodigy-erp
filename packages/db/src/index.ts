@@ -546,6 +546,10 @@ async function applySchema(): Promise<void> {
     -- Link an order line to the product it sold (placed after products exists).
     ALTER TABLE order_line_items ADD COLUMN IF NOT EXISTS product_id BIGINT REFERENCES products(id);
 
+    -- Self-serve management token for online bookings (slice 20).
+    ALTER TABLE appointments ADD COLUMN IF NOT EXISTS manage_token TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_appt_manage_token ON appointments(manage_token) WHERE manage_token IS NOT NULL;
+
     -- Recurring memberships (slice 17). Money in cents; discount in basis points; periods are dates.
     CREATE TABLE IF NOT EXISTS membership_plans (
       id             BIGSERIAL PRIMARY KEY,

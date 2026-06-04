@@ -123,7 +123,8 @@ export async function computeAvailability(
   dateStr: string,
   durationMinutes: number,
   timeZone: string,
-  stepMinutes = 15
+  stepMinutes = 15,
+  excludeAppointmentId: string | null = null
 ): Promise<DayAvailability> {
   const dow = dayOfWeekFor(dateStr, timeZone);
 
@@ -155,9 +156,10 @@ export async function computeAvailability(
      FROM appointments a LEFT JOIN clients c ON c.id = a.client_id
      WHERE a.tenant_id = $1 AND a.provider_id = $2
        AND a.status NOT IN ('cancelled', 'no_show')
+       AND ($5::bigint IS NULL OR a.id <> $5)
        AND a.starts_at < $4 AND a.ends_at > $3
      ORDER BY a.starts_at`,
-    [tenantId, providerId, dayStart, dayEnd]
+    [tenantId, providerId, dayStart, dayEnd, excludeAppointmentId]
   );
   for (const ap of appts) {
     const sp = utcToZonedParts(new Date(ap.starts_at).toISOString(), timeZone);

@@ -20,6 +20,7 @@ interface PConf {
   endsAt: string;
   serviceName: string;
   providerName: string;
+  manageToken: string;
 }
 interface Info {
   businessName: string;
@@ -174,6 +175,9 @@ export function PublicBooking() {
               </span>
             </div>
           </div>
+          <p className="muted small">
+            Need to change it? <a href={`/book/manage/${confirmation.manageToken}`}>Manage or cancel this booking</a> — save this link.
+          </p>
           <div className="editor-actions">
             <button className="btn primary" onClick={reset}>
               Book another

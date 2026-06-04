@@ -14,6 +14,7 @@ import { InventoryPage } from "./Inventory";
 import { ReportsPage } from "./Reports";
 import { MembershipsPage } from "./Memberships";
 import { PublicBooking } from "./PublicBooking";
+import { PublicManageBooking } from "./PublicManageBooking";
 import { AuditPage } from "./Audit";
 
 export function App() {
@@ -31,7 +32,10 @@ function Root() {
   if (typeof window !== "undefined" && window.location.pathname === "/accept-invite") {
     return <AcceptInvite />;
   }
-  // The client-facing booking page is fully public.
+  // The client-facing booking + self-serve manage pages are fully public.
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/book/manage")) {
+    return <PublicManageBooking />;
+  }
   if (typeof window !== "undefined" && window.location.pathname.startsWith("/book")) {
     return <PublicBooking />;
   }
