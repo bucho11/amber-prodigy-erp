@@ -545,6 +545,49 @@ async function applySchema(): Promise<void> {
 
     -- Link an order line to the product it sold (placed after products exists).
     ALTER TABLE order_line_items ADD COLUMN IF NOT EXISTS product_id BIGINT REFERENCES products(id);
+
+    -- Recurring memberships (slice 17). Money in cents; discount in basis points; periods are dates.
+    CREATE TABLE IF NOT EXISTS membership_plans (
+      id             BIGSERIAL PRIMARY KEY,
+      tenant_id      BIGINT NOT NULL REFERENCES tenants(id),
+      name           TEXT NOT NULL,
+      price_cents    INTEGER NOT NULL DEFAULT 0,
+      billing_period TEXT NOT NULL DEFAULT 'monthly',
+      discount_bps   INTEGER NOT NULL DEFAULT 0,
+      is_active      BOOLEAN NOT NULL DEFAULT true,
+      note           TEXT,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_membership_plans ON membership_plans(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS memberships (
+      id                   BIGSERIAL PRIMARY KEY,
+      tenant_id            BIGINT NOT NULL REFERENCES tenants(id),
+      client_id            BIGINT NOT NULL REFERENCES clients(id),
+      plan_id              BIGINT NOT NULL REFERENCES membership_plans(id),
+      status               TEXT NOT NULL DEFAULT 'active',   -- active | paused | cancelled
+      price_cents          INTEGER NOT NULL,
+      discount_bps         INTEGER NOT NULL DEFAULT 0,
+      started_on           DATE NOT NULL,
+      current_period_start DATE NOT NULL,
+      current_period_end   DATE NOT NULL,
+      cancelled_at         TIMESTAMPTZ,
+      created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_memberships_client ON memberships(tenant_id, client_id);
+
+    CREATE TABLE IF NOT EXISTS membership_invoices (
+      id            BIGSERIAL PRIMARY KEY,
+      tenant_id     BIGINT NOT NULL REFERENCES tenants(id),
+      membership_id BIGINT NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+      period_start  DATE NOT NULL,
+      period_end    DATE NOT NULL,
+      amount_cents  INTEGER NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'pending',         -- pending | paid | void
+      paid_at       TIMESTAMPTZ,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_membership_invoices ON membership_invoices(tenant_id, membership_id);
   `);
 }
 
@@ -658,6 +701,7 @@ async function seedTenantOne(): Promise<void> {
        ('3000', 'Owner''s Equity', 'equity', 'credit'),
        ('3900', 'Retained Earnings', 'equity', 'credit'),
        ('4000', 'Sales Revenue', 'revenue', 'credit'),
+       ('4100', 'Membership Revenue', 'revenue', 'credit'),
        ('4900', 'Other Income', 'revenue', 'credit'),
        ('5000', 'Cost of Goods Sold', 'expense', 'debit'),
        ('6000', 'Operating Expenses', 'expense', 'debit'),
@@ -716,3 +760,4 @@ export * from "./packages";
 export * from "./ledger";
 export * from "./inventory";
 export * from "./reports";
+export * from "./memberships";

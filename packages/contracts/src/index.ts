@@ -648,3 +648,41 @@ export interface InventorySnapshot {
   outOfStockCount: number;
   lowStock: LowStockItem[];
 }
+
+
+// ---- Recurring memberships ----
+export type MembershipStatus = "active" | "paused" | "cancelled";
+export type MembershipInvoiceStatus = "pending" | "paid" | "void";
+export interface MembershipPlan {
+  id: string;
+  name: string;
+  priceCents: number;
+  billingPeriod: string; // "monthly"
+  discountBps: number;   // member discount benefit (0 = none)
+  isActive: boolean;
+  note: string | null;
+  createdAt: string;
+}
+export interface Membership {
+  id: string;
+  clientId: string;
+  clientName: string | null;
+  planId: string;
+  planName: string | null;
+  status: MembershipStatus;
+  priceCents: number;      // snapshot of plan price at signup
+  discountBps: number;     // snapshot of plan discount at signup
+  startedOn: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string; // next bill date
+  createdAt: string;
+}
+export interface MembershipInvoice {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  amountCents: number;
+  status: MembershipInvoiceStatus;
+  paidAt: string | null;
+  createdAt: string;
+}

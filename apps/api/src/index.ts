@@ -34,6 +34,7 @@ import { registerPackageRoutes } from "./routes-packages";
 import { registerLedgerRoutes } from "./routes-ledger";
 import { registerInventoryRoutes } from "./routes-inventory";
 import { registerReportRoutes } from "./routes-reports";
+import { registerMembershipRoutes } from "./routes-memberships";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -116,6 +117,9 @@ registerInventoryRoutes(api);
 
 // Reports routes.
 registerReportRoutes(api);
+
+// Membership routes.
+registerMembershipRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(
@@ -314,6 +318,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
       return;
     }
     if (err.name === "InventoryError") {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    if (err.name === "MembershipError") {
       res.status(400).json({ error: err.message });
       return;
     }

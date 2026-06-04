@@ -6,6 +6,7 @@ import type {
   GiftCardTxn,
   Order,
   PackageTxn,
+  Membership,
   Product,
   ServicePackage,
   OrderListItem,
@@ -165,6 +166,7 @@ function Ticket({
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [membership, setMembership] = useState<Membership | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [variantId, setVariantId] = useState("");
   const [cDesc, setCDesc] = useState("");
@@ -199,6 +201,11 @@ function Ticket({
   useEffect(() => {
     api<{ products: Product[] }>("/products?activeOnly=true").then((r) => setProducts(r.products)).catch(() => {});
   }, []);
+  useEffect(() => {
+    if (order.clientId)
+      api<{ membership: Membership | null }>(`/clients/${order.clientId}/membership`).then((r) => setMembership(r.membership)).catch(() => setMembership(null));
+    else setMembership(null);
+  }, [order.clientId]);
   useEffect(() => {
     setPayAmount((order.balanceCents / 100).toFixed(2));
   }, [order.balanceCents]);
@@ -275,6 +282,12 @@ function Ticket({
   const addProduct = (productId: string) => {
     setErr(null);
     api<{ order: Order }>(`/orders/${order.id}/products`, "POST", { productId, quantity: 1 })
+      .then((r) => onOrder(r.order))
+      .catch((e) => setErr((e as Error).message));
+  };
+  const applyMemberDiscount = () => {
+    setErr(null);
+    api<{ order: Order }>(`/orders/${order.id}/apply-member-discount`, "POST")
       .then((r) => onOrder(r.order))
       .catch((e) => setErr((e as Error).message));
   };
@@ -369,6 +382,19 @@ function Ticket({
                   {pr.name} · {fmt(pr.priceCents)}
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {membership && membership.discountBps > 0 && (
+          <div className="quick-appts">
+            <span className="muted small">
+              Member: {membership.planName || "plan"} · {(membership.discountBps / 100).toFixed(membership.discountBps % 100 === 0 ? 0 : 1)}% off
+            </span>
+            <div className="chip-row">
+              <button className="chip" onClick={() => applyMemberDiscount()}>
+                Apply member discount
+              </button>
             </div>
           </div>
         )}
