@@ -1,4 +1,5 @@
 import { query, withTransaction } from "./index";
+import { postInventoryOpening, postInventoryReceipt, postInventoryAdjustment } from "./ledger";
 import type { Order, Product, ProductTxn } from "@prodigy/contracts";
 
 const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -76,6 +77,7 @@ export async function createProduct(
   }
 ): Promise<Product> {
   let id = "";
+  let openTxnId: string | null = null;
   await withTransaction(async (q) => {
     const rows = await q<{ id: string }>(
       `INSERT INTO products (tenant_id, name, sku, price_cents, cost_cents, taxable, track_inventory, stock_qty, reorder_point)
@@ -94,15 +96,22 @@ export async function createProduct(
     );
     id = rows[0].id;
     if (input.trackInventory && input.stockQty !== 0) {
-      await q(`INSERT INTO inventory_txns (tenant_id, product_id, kind, qty_delta, note) VALUES ($1, $2::bigint, 'receive', $3, 'Opening stock')`, [
-        tenantId,
-        id,
-        input.stockQty,
-      ]);
+      const tx = await q<{ id: string }>(
+        `INSERT INTO inventory_txns (tenant_id, product_id, kind, qty_delta, note) VALUES ($1, $2::bigint, 'receive', $3, 'Opening stock') RETURNING id::text AS id`,
+        [tenantId, id, input.stockQty]
+      );
+      openTxnId = tx[0].id;
     }
   });
   const p = await getProduct(tenantId, id);
   if (!p) throw new Error("failed to load created product");
+  if (openTxnId && input.trackInventory && input.stockQty > 0 && input.costCents > 0) {
+    try {
+      await postInventoryOpening(tenantId, openTxnId, input.stockQty * input.costCents, p.name);
+    } catch (e) {
+      console.error("[ledger] opening stock post failed", e);
+    }
+  }
   return p;
 }
 
@@ -157,18 +166,27 @@ export async function adjustStock(
   if (!existing) throw new InventoryError("Product not found.");
   if (!existing.trackInventory) throw new InventoryError("This product doesn't track inventory.");
   if (input.qtyDelta === 0) throw new InventoryError("Enter a non-zero quantity.");
+  let txnId = "";
   await withTransaction(async (q) => {
     await q(`UPDATE products SET stock_qty = stock_qty + $3 WHERE tenant_id = $1 AND id = $2`, [tenantId, id, input.qtyDelta]);
-    await q(`INSERT INTO inventory_txns (tenant_id, product_id, kind, qty_delta, note) VALUES ($1, $2::bigint, $3, $4, $5)`, [
-      tenantId,
-      id,
-      input.kind,
-      input.qtyDelta,
-      input.note,
-    ]);
+    const tx = await q<{ id: string }>(
+      `INSERT INTO inventory_txns (tenant_id, product_id, kind, qty_delta, note) VALUES ($1, $2::bigint, $3, $4, $5) RETURNING id::text AS id`,
+      [tenantId, id, input.kind, input.qtyDelta, input.note]
+    );
+    txnId = tx[0].id;
   });
   const p = await getProduct(tenantId, id);
   if (!p) throw new Error("failed to load product after adjustment");
+  const valueCents = input.qtyDelta * existing.costCents;
+  try {
+    if (input.kind === "receive") {
+      if (valueCents > 0) await postInventoryReceipt(tenantId, txnId, valueCents, p.name);
+    } else {
+      await postInventoryAdjustment(tenantId, txnId, valueCents, p.name);
+    }
+  } catch (e) {
+    console.error("[ledger] inventory adjustment post failed", e);
+  }
   return p;
 }
 

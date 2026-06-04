@@ -290,12 +290,12 @@ export async function postOrderSettlement(tenantId: string, order: Order): Promi
 }
 
 /** Reverse a previously posted settlement (for void / refund). */
-export async function reverseOrderSettlement(tenantId: string, orderId: string, reason: string): Promise<void> {
+async function reverseEntryForSource(tenantId: string, sourceType: string, sourceId: string, reason: string): Promise<void> {
   const orig = await query<{ id: string }>(
     `SELECT id::text AS id FROM journal_entries
-     WHERE tenant_id = $1 AND source_type = 'order' AND source_id = $2 AND reverses_entry_id IS NULL
+     WHERE tenant_id = $1 AND source_type = $2 AND source_id = $3 AND reverses_entry_id IS NULL
      ORDER BY id DESC LIMIT 1`,
-    [tenantId, orderId]
+    [tenantId, sourceType, sourceId]
   );
   if (!orig[0]) return;
   const already = await query(`SELECT 1 FROM journal_entries WHERE tenant_id = $1 AND reverses_entry_id = $2 LIMIT 1`, [
@@ -310,12 +310,22 @@ export async function reverseOrderSettlement(tenantId: string, orderId: string, 
   if (!lines.length) return;
   await createJournalEntry(tenantId, {
     entryDate: today(),
-    memo: `${reason} — reverses sale #${orderId}`,
-    sourceType: "order",
-    sourceId: orderId,
+    memo: `${reason} — reverses #${sourceId}`,
+    sourceType,
+    sourceId,
     reversesEntryId: orig[0].id,
     lines: lines.map((l) => ({ accountId: l.account_id, debitCents: l.credit_cents, creditCents: l.debit_cents })),
   });
+}
+
+/** Reverse a previously posted sale settlement (for void / refund). */
+export async function reverseOrderSettlement(tenantId: string, orderId: string, reason: string): Promise<void> {
+  return reverseEntryForSource(tenantId, "order", orderId, reason);
+}
+
+/** Reverse a previously posted cost-of-goods entry (for refund). */
+export async function reverseOrderCOGS(tenantId: string, orderId: string, reason: string): Promise<void> {
+  return reverseEntryForSource(tenantId, "cogs", orderId, reason);
 }
 
 /** Selling a gift card: cash in, liability owed. */
@@ -356,6 +366,75 @@ export async function postPackageSold(
     lines: [
       { accountId: ids["1010"], debitCents: pkg.priceCents, creditCents: 0 },
       { accountId: ids["4000"], debitCents: 0, creditCents: pkg.priceCents },
+    ],
+  });
+}
+
+
+// ---- inventory <-> books (slice 16): perpetual inventory + COGS ----
+async function postInventoryEntry(
+  tenantId: string,
+  sourceType: string,
+  txnId: string,
+  memo: string,
+  debitCode: string,
+  creditCode: string,
+  amountCents: number
+): Promise<void> {
+  if (amountCents <= 0) return;
+  if (await alreadyPosted(tenantId, sourceType, txnId)) return;
+  const ids = await accountIdsByCode(tenantId, [debitCode, creditCode]);
+  if (!ids) return;
+  await createJournalEntry(tenantId, {
+    entryDate: today(),
+    memo,
+    sourceType,
+    sourceId: txnId,
+    lines: [
+      { accountId: ids[debitCode], debitCents: amountCents, creditCents: 0 },
+      { accountId: ids[creditCode], debitCents: 0, creditCents: amountCents },
+    ],
+  });
+}
+
+/** Opening stock at product creation: capitalize inventory against owner's equity. */
+export async function postInventoryOpening(tenantId: string, txnId: string, valueCents: number, name: string): Promise<void> {
+  await postInventoryEntry(tenantId, "inv_open", txnId, `Opening stock \u2014 ${name}`, "1500", "3000", valueCents);
+}
+
+/** Receiving purchased stock: inventory up, cash down (assumes paid on receipt). */
+export async function postInventoryReceipt(tenantId: string, txnId: string, valueCents: number, name: string): Promise<void> {
+  await postInventoryEntry(tenantId, "inv_receive", txnId, `Received stock \u2014 ${name}`, "1500", "1010", valueCents);
+}
+
+/** Manual adjustment / count: the inventory value change flows through operating expenses. */
+export async function postInventoryAdjustment(tenantId: string, txnId: string, valueCents: number, name: string): Promise<void> {
+  if (valueCents > 0) await postInventoryEntry(tenantId, "inv_adjust", txnId, `Inventory adjustment \u2014 ${name}`, "1500", "6000", valueCents);
+  else if (valueCents < 0) await postInventoryEntry(tenantId, "inv_adjust", txnId, `Inventory adjustment \u2014 ${name}`, "6000", "1500", -valueCents);
+}
+
+/** Cost of goods sold when a sale settles: COGS up, inventory down (current cost). */
+export async function postOrderCOGS(tenantId: string, order: Order): Promise<void> {
+  if (await alreadyPosted(tenantId, "cogs", order.id)) return;
+  if (!order.lineItems.some((l) => l.productId)) return;
+  const rows = await query<{ cogs: string }>(
+    `SELECT COALESCE(SUM(oli.quantity * p.cost_cents), 0)::bigint AS cogs
+     FROM order_line_items oli JOIN products p ON p.id = oli.product_id
+     WHERE oli.tenant_id = $1 AND oli.order_id = $2 AND p.track_inventory = true`,
+    [tenantId, order.id]
+  );
+  const cogs = Number(rows[0].cogs);
+  if (cogs <= 0) return;
+  const ids = await accountIdsByCode(tenantId, ["5000", "1500"]);
+  if (!ids) return;
+  await createJournalEntry(tenantId, {
+    entryDate: today(),
+    memo: `Cost of goods \u2014 sale #${order.id}`,
+    sourceType: "cogs",
+    sourceId: order.id,
+    lines: [
+      { accountId: ids["5000"], debitCents: cogs, creditCents: 0 },
+      { accountId: ids["1500"], debitCents: 0, creditCents: cogs },
     ],
   });
 }

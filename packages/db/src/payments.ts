@@ -1,5 +1,5 @@
 import { query, withTransaction } from "./index";
-import { postOrderSettlement, reverseOrderSettlement } from "./ledger";
+import { postOrderSettlement, reverseOrderSettlement, postOrderCOGS, reverseOrderCOGS } from "./ledger";
 import { applyOrderStockOnSettlement, restoreOrderStockOnRefund } from "./inventory";
 import type {
   Order,
@@ -357,6 +357,11 @@ export async function addPayment(tenantId: string, orderId: string, input: AddPa
     } catch (e) {
       console.error("[inventory] stock decrement failed", e);
     }
+    try {
+      await postOrderCOGS(tenantId, order);
+    } catch (e) {
+      console.error("[ledger] COGS post failed", e);
+    }
   }
   return order;
 }
@@ -405,6 +410,11 @@ export async function refundOrder(tenantId: string, orderId: string): Promise<Or
     await restoreOrderStockOnRefund(tenantId, orderId);
   } catch (e) {
     console.error("[inventory] stock restore failed", e);
+  }
+  try {
+    await reverseOrderCOGS(tenantId, orderId, "Refund");
+  } catch (e) {
+    console.error("[ledger] COGS reversal failed", e);
   }
   return getOrder(tenantId, orderId);
 }
