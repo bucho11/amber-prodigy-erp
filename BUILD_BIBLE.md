@@ -129,3 +129,15 @@ persistence + the seeded tenant on the next Publish.
 Functional NOW via licensed partners (no platform license): card payments/deposits/payouts (Stripe Connect); payroll w/ tax filing (embedded provider); SMS (Twilio, after the business's A2P 10DLC registration); email; clinical docs w/ HIPAA-grade safeguards; gift cards/memberships/packages; inventory/COGS; the accounting GL / system of record; sales-tax calc + liability + filing-ready reports.
 GATED → build infra now, ship behind "Coming Soon", owner flips on after securing approvals: **electronic insurance billing + formal HIPAA program + BAA**. (Anything requiring *us* to hold a license — our own payfac / payroll-filer / lender — is avoided by using the partner instead.)
 Not a gated feature: income-tax e-filing (hand off to CPA/TurboTax from tax-ready books).
+
+## 10. Vision reframe — North Star v2 (2026-06-04)
+Bucho judged the current platform too bland (UI especially) and too shallow vs. the category leader ("Vagaro beats us 100%"). We researched the full niche (Vagaro, Zenoti, Boulevard, Mangomint, GlossGenius, Fresha, Mindbody, Phorest, WellnessLiving on the salon/spa side; Jane, ClinicSense, Noterro, MassageBook on the clinical side; CheckMark, Gusto/ADP, QuickBooks on the books/payroll side) and reframed the North Star. Full living doc: **`NORTH_STAR.md`** (read it at session start alongside the others).
+
+**Reframed North Star:** the first wellness-vertical platform that runs the front of house like the best salon/spa software, charts & bills like the best clinical software, and keeps the books & payroll like real accounting software — AI-native, best-in-class UI, one system. **Key strategic insight: no competitor fuses all three layers** (front-of-house + clinical + real books/payroll); that fusion is our defensible, currently-unoccupied position. Our GL is already deeper than Vagaro's (which only syncs to QuickBooks) and even Zenoti's — a real wedge. Entry wedge = massage/bodywork/wellness-clinical (Amber's world).
+
+**Bucho's locked decisions (2026-06-04):**
+- North Star framing: **BOTH — leapfrog (differentiate) first, then parity.**
+- First workstream: **UI / design-system overhaul.**
+- **LOCKED OPERATING RULE — regulated rails activate LAST, "the very end, before we ship," with Bucho's own accounts.** Covers live card payment processing, SMS/email *sending*, and payroll tax filing / ACH. We may build the software AROUND them earlier (POS UI, comms/campaign engine, payroll calc + paystubs + checks + filing prep) but must NOT wire the live external service / move money / send messages until the final pre-launch step. ALWAYS reference this before building anything that touches those rails.
+
+**Sequence:** (1) UI overhaul → (2) differentiated depth + rail-free parity (comms/marketing engine with sending deferred; clinical depth incl. form builder/e-sign/body charts/superbill prep; back-office depth incl. A/R, A/P+vendors, bank rec, financial statements, period close, payroll calc/paystubs/checks/1099-W2 prep; front-of-house polish incl. deposits/waitlist/classes/website builder/reviews) → (3) regulated rails go-live last.
