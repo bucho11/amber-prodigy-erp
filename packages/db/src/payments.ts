@@ -1,5 +1,6 @@
 import { query, withTransaction } from "./index";
 import { postOrderSettlement, reverseOrderSettlement } from "./ledger";
+import { applyOrderStockOnSettlement, restoreOrderStockOnRefund } from "./inventory";
 import type {
   Order,
   OrderLineItem,
@@ -72,10 +73,11 @@ async function fetchLines(tenantId: string, orderId: string): Promise<OrderLineI
     service_variant_id: string | null;
     appointment_id: string | null;
     package_id: string | null;
+    product_id: string | null;
   }>(
     `SELECT id::text AS id, kind, description, quantity, unit_price_cents, amount_cents, taxable,
             service_variant_id::text AS service_variant_id, appointment_id::text AS appointment_id,
-            package_id::text AS package_id
+            package_id::text AS package_id, product_id::text AS product_id
      FROM order_line_items WHERE tenant_id = $1 AND order_id = $2 ORDER BY id`,
     [tenantId, orderId]
   );
@@ -90,6 +92,7 @@ async function fetchLines(tenantId: string, orderId: string): Promise<OrderLineI
     serviceVariantId: r.service_variant_id,
     appointmentId: r.appointment_id,
     packageId: r.package_id,
+    productId: r.product_id,
   }));
 }
 
@@ -242,14 +245,15 @@ export interface AddLineInput {
   taxable: boolean;
   serviceVariantId: string | null;
   appointmentId: string | null;
+  productId?: string | null;
 }
 export async function addLineItem(tenantId: string, orderId: string, input: AddLineInput): Promise<Order> {
   await requireOpen(tenantId, orderId);
   const amount = input.quantity * input.unitPriceCents;
   await query(
     `INSERT INTO order_line_items
-       (tenant_id, order_id, kind, description, quantity, unit_price_cents, amount_cents, taxable, service_variant_id, appointment_id)
-     VALUES ($1, $2::bigint, $3, $4, $5, $6, $7, $8, $9::bigint, $10::bigint)`,
+       (tenant_id, order_id, kind, description, quantity, unit_price_cents, amount_cents, taxable, service_variant_id, appointment_id, product_id)
+     VALUES ($1, $2::bigint, $3, $4, $5, $6, $7, $8, $9::bigint, $10::bigint, $11::bigint)`,
     [
       tenantId,
       orderId,
@@ -261,6 +265,7 @@ export async function addLineItem(tenantId: string, orderId: string, input: AddL
       input.taxable,
       input.serviceVariantId,
       input.appointmentId,
+      input.productId ?? null,
     ]
   );
   await recompute(tenantId, orderId);
@@ -347,6 +352,11 @@ export async function addPayment(tenantId: string, orderId: string, input: AddPa
     } catch (e) {
       console.error("[ledger] settlement post failed", e);
     }
+    try {
+      await applyOrderStockOnSettlement(tenantId, order);
+    } catch (e) {
+      console.error("[inventory] stock decrement failed", e);
+    }
   }
   return order;
 }
@@ -390,6 +400,11 @@ export async function refundOrder(tenantId: string, orderId: string): Promise<Or
     await reverseOrderSettlement(tenantId, orderId, "Refund");
   } catch (e) {
     console.error("[ledger] refund reversal failed", e);
+  }
+  try {
+    await restoreOrderStockOnRefund(tenantId, orderId);
+  } catch (e) {
+    console.error("[inventory] stock restore failed", e);
   }
   return getOrder(tenantId, orderId);
 }

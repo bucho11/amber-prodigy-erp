@@ -512,6 +512,39 @@ async function applySchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_journal_lines_entry ON journal_lines(tenant_id, entry_id);
     CREATE INDEX IF NOT EXISTS idx_journal_lines_account ON journal_lines(tenant_id, account_id);
+
+    -- Retail products + inventory (slice 14). Quantities are whole units; money in cents.
+    CREATE TABLE IF NOT EXISTS products (
+      id              BIGSERIAL PRIMARY KEY,
+      tenant_id       BIGINT NOT NULL REFERENCES tenants(id),
+      name            TEXT NOT NULL,
+      sku             TEXT,
+      price_cents     INTEGER NOT NULL DEFAULT 0,
+      cost_cents      INTEGER NOT NULL DEFAULT 0,
+      taxable         BOOLEAN NOT NULL DEFAULT true,
+      track_inventory BOOLEAN NOT NULL DEFAULT true,
+      stock_qty       INTEGER NOT NULL DEFAULT 0,
+      reorder_point   INTEGER NOT NULL DEFAULT 0,
+      is_active       BOOLEAN NOT NULL DEFAULT true,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_products_tenant ON products(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS inventory_txns (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      product_id  BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      kind        TEXT NOT NULL,       -- receive | adjust | count | sale | return
+      qty_delta   INTEGER NOT NULL,    -- signed
+      order_id    BIGINT REFERENCES orders(id),
+      note        TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_inventory_txns ON inventory_txns(tenant_id, product_id);
+    CREATE INDEX IF NOT EXISTS idx_inventory_txns_order ON inventory_txns(tenant_id, order_id);
+
+    -- Link an order line to the product it sold (placed after products exists).
+    ALTER TABLE order_line_items ADD COLUMN IF NOT EXISTS product_id BIGINT REFERENCES products(id);
   `);
 }
 
@@ -681,3 +714,4 @@ export * from "./availability";
 export * from "./giftcards";
 export * from "./packages";
 export * from "./ledger";
+export * from "./inventory";

@@ -1,6 +1,7 @@
 import { query, withTransaction } from "./index";
 import { getOrder, OrderNotFoundError, OrderClosedError } from "./payments";
 import { postGiftCardIssued, postOrderSettlement } from "./ledger";
+import { applyOrderStockOnSettlement } from "./inventory";
 import type { GiftCard, GiftCardTxn, Order } from "@prodigy/contracts";
 
 const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -190,6 +191,11 @@ export async function payOrderWithGiftCard(
       await postOrderSettlement(tenantId, order);
     } catch (e) {
       console.error("[ledger] gift settlement post failed", e);
+    }
+    try {
+      await applyOrderStockOnSettlement(tenantId, order);
+    } catch (e) {
+      console.error("[inventory] stock decrement failed", e);
     }
   }
   return { order, giftCard };

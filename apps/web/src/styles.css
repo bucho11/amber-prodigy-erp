@@ -252,3 +252,7 @@ textarea.input { resize: vertical; min-height: 52px; font: inherit; }
 .data-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .data-table tfoot .total-row td { font-weight: 700; border-top: 2px solid var(--line); border-bottom: none; }
 .cap { text-transform: capitalize; }
+
+/* Inventory: low-stock badge + inline checkbox field */
+.status-badge.s-warn { background: #f6ecd9; color: var(--warn); }
+.checkbox-field { display: flex; flex-direction: row; align-items: center; gap: 8px; }

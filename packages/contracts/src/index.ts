@@ -346,6 +346,7 @@ export interface OrderLineItem {
   serviceVariantId: string | null;
   appointmentId: string | null;
   packageId: string | null; // set when this line was covered by a package credit
+  productId: string | null; // set when this line sold a catalog product
 }
 
 export interface OrderPayment {
@@ -571,4 +572,29 @@ export interface TrialBalance {
   rows: TrialBalanceRow[];
   totalDebitCents: number;
   totalCreditCents: number;
+}
+
+
+// ---- Retail products / inventory ----
+export interface Product {
+  id: string;
+  name: string;
+  sku: string | null;
+  priceCents: number;
+  costCents: number;
+  taxable: boolean;
+  trackInventory: boolean;
+  stockQty: number;
+  reorderPoint: number;
+  belowReorder: boolean;
+  isActive: boolean;
+  createdAt: string;
+}
+export interface ProductTxn {
+  id: string;
+  kind: string;        // receive | adjust | count | sale | return
+  qtyDelta: number;    // signed
+  orderId: string | null;
+  note: string | null;
+  createdAt: string;
 }

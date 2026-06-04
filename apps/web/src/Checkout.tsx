@@ -6,6 +6,7 @@ import type {
   GiftCardTxn,
   Order,
   PackageTxn,
+  Product,
   ServicePackage,
   OrderListItem,
   PaymentMethod,
@@ -163,6 +164,7 @@ function Ticket({
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [packages, setPackages] = useState<ServicePackage[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [variantId, setVariantId] = useState("");
   const [cDesc, setCDesc] = useState("");
@@ -194,6 +196,9 @@ function Ticket({
     loadPackages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.clientId]);
+  useEffect(() => {
+    api<{ products: Product[] }>("/products?activeOnly=true").then((r) => setProducts(r.products)).catch(() => {});
+  }, []);
   useEffect(() => {
     setPayAmount((order.balanceCents / 100).toFixed(2));
   }, [order.balanceCents]);
@@ -265,6 +270,12 @@ function Ticket({
         onOrder(r.order);
         loadPackages();
       })
+      .catch((e) => setErr((e as Error).message));
+  };
+  const addProduct = (productId: string) => {
+    setErr(null);
+    api<{ order: Order }>(`/orders/${order.id}/products`, "POST", { productId, quantity: 1 })
+      .then((r) => onOrder(r.order))
       .catch((e) => setErr((e as Error).message));
   };
 
@@ -343,6 +354,19 @@ function Ticket({
               {packages.map((pk) => (
                 <button key={pk.id} className="chip" onClick={() => redeemPackage(pk.id)}>
                   {pk.serviceName || "Package"} · {pk.remainingCredits} left
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {products.length > 0 && (
+          <div className="quick-appts">
+            <span className="muted small">Retail products:</span>
+            <div className="chip-row">
+              {products.map((pr) => (
+                <button key={pr.id} className="chip" onClick={() => addProduct(pr.id)}>
+                  {pr.name} · {fmt(pr.priceCents)}
                 </button>
               ))}
             </div>
