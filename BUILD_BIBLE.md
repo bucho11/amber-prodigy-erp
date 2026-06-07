@@ -44,7 +44,8 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
-| 2026-06-07 | **~22%** | **~60%** | Framework adopted; gates verified green. 20 slices shipped (foundation→POS→GL→inventory→reporting→memberships→public booking→clinical audit→self-serve manage). Remaining build-ready: committed test/audit harness, UI/design-system overhaul (NORTH_STAR #1), clinical depth, back-office depth (A/R, A/P, bank rec, statements, payroll calc), front-of-house polish, AI core. A is gated on rails + runtime money-path verification + HIPAA path. |
+| 2026-06-07 | **~16%** | **~40%** | **Re-baseline (scope expanded, P6):** vision is now a *maximalist, end-to-end, Agentic-OS* platform — absorb every feature the wellness niche wants AND lead with an agentic AI layer (orchestrator + domain agents). The denominator grew a lot, so both % drop honestly even though no code regressed. The 20 shipped slices are unchanged; what's now "100%" is much bigger (full feature absorption + the whole agent system + UI overhaul + back-office/clinical depth). |
+| 2026-06-07 | **~22%** | **~60%** | Framework adopted; gates verified green. 20 slices shipped (foundation→POS→GL→inventory→reporting→memberships→public booking→clinical audit→self-serve manage). *(Superseded by the re-baseline above once the Agentic-OS vision was ratified.)* |
 
 ### 0.3 Ratified alignment (kickoff 2026-06-07 — durable; do not re-litigate)
 - **Outcome & bar:** the reframed North Star (see `NORTH_STAR.md`) — the first wellness-vertical
@@ -65,6 +66,24 @@ reality, not priors.
 - **Reference leaders (per axis):** front-of-house → **Boulevard, Mangomint** (+ Vagaro parity,
   Zenoti "everything"); clinical → **Jane, ClinicSense, Noterro**; back-office → **CheckMark, Gusto**
   (+ ADP); pricing/acquisition → Fresha; mobile/design → GlossGenius. Full landscape in `NORTH_STAR.md`.
+- **Product ambition (ratified 2026-06-07 — expanded vision):** this is a **maximalist, end-to-end**
+  platform that **absorbs every feature & capability the niche could ever want** (front-of-house +
+  clinical + back-office, to 10/10 depth), and **leads with Agentic AI**. Take the vision to its
+  highest value; improve continuously; web-research is the primary tool and must be used heavily.
+- **Agentic-AI vision (ratified 2026-06-07 — the differentiator):** an **Agentic OS** — a central
+  **orchestrator** plus **per-domain agents** (front-desk/booking, clinical scribe, books &
+  reconciliation, marketing/comms, inventory/purchasing, analytics) that take **real,
+  permission-scoped, fully-audited actions** on the user's behalf, with **human-approval gates** on
+  anything that moves money, touches clinical/PII, or is outward-facing. The platform "runs itself";
+  staff supervise. **Provider:** **Claude (Anthropic), latest models**, behind an **inert simulated
+  provider seam** (deterministic, clearly flagged — framework P11/A.4) so the entire agent system is
+  built & tested with **no key**; it lights up live when `ANTHROPIC_API_KEY` is present. The LLM key
+  is **not** a regulated rail (it can go live mid-build, non-blocking); money/SMS/payroll rails still
+  go LAST. **Sequence:** gate (Inc 1) → AI core foundation (provider seam + agent runtime + tool/
+  function registry over existing modules + memory + audit + approval gates) → then every subsequent
+  build, including the UI overhaul (which becomes the agentic surface), is designed AI-native around it.
+- **Niche scope:** wedge-deep on **massage/bodywork/wellness-clinical** to 10/10, but **architect
+  multi-vertical** (salon/spa/med-spa/fitness) so broadening later is config, not a rebuild.
 - **Hard constraints (LOCKED, from `NORTH_STAR.md`):** (1) regulated external rails — live card
   processing, SMS/email **sending**, payroll tax filing / ACH — are activated **LAST**, right before
   ship, and only with Bucho's own accounts (build the software around them earlier as inert seams).
@@ -87,7 +106,17 @@ reality, not priors.
   (ACH + filing rails-gated).
 - **B6 — Front-of-house polish:** deposits (Stripe-gated), waitlist, classes, website/branded app,
   reviews/reputation, resources.
-- **B7 — AI core** (Bucho's differentiator) — where it first shows up, TBD.
+- **B7 — AI CORE / Agentic OS** *(the differentiator; epic — starts right after the gate)*:
+  (a) **provider seam** — `AiProvider` interface + deterministic `SimulatedAiProvider` (no key) +
+  `ClaudeAiProvider` (Anthropic, latest models) behind one factory; (b) **agent runtime** — an
+  orchestrator + per-domain agents; (c) **tool/function registry** — typed, permission-scoped,
+  tenant-scoped, **audited** tool calls that wrap the EXISTING db modules (booking, POS, ledger,
+  clinical, inventory, …) so agents act through the same guards humans do; (d) **memory** (per-tenant,
+  per-conversation) + **approval gates** (money/clinical/outward actions require human sign-off);
+  (e) surfaced in the UI as the agentic command surface. Research Agentic AI heavily before building.
+- **B-SCOPE — Maximal feature absorption** *(standing directive)*: continuously close parity gaps vs
+  the reference leaders across all three layers (front-of-house, clinical, back-office) to 10/10 depth.
+  Each major feature: research ≥2–3 leaders first, cite in the BL entry.
 - **B8 — Comms/marketing engine** (campaigns, automations, templates, loyalty, AI copy) — built now,
   **sending deferred** to the rails step.
 - **B-RAILS (owner-gated, activated LAST):** Stripe go-live, Twilio + A2P 10DLC, payroll ACH + tax
@@ -97,6 +126,21 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-002 (2026-06-07) — Ratify the maximalist Agentic-OS vision + re-baseline metrics [sets the whole architecture]
+WHAT: Recorded Bucho's expanded vision in §0.3 (maximalist end-to-end feature absorption + lead with
+Agentic AI), the agentic-AI architecture decision (Agentic OS: orchestrator + permission-scoped,
+audited domain agents with human-approval gates; Claude behind an inert simulated seam; sequence =
+gate → AI core → AI-native everything; multi-vertical architecture, wedge-deep first). Expanded the
+backlog (B7 → AI CORE epic; new B-SCOPE directive). Re-baselined the two metrics DOWN (A 22→16%,
+B 60→40%) because the target grew, not because anything regressed.
+WHY/HOW: Bucho granted full autonomy after this alignment; per P6 (honest reporting) and Part 3 (say
+why a metric moves), a bigger denominator must lower the % even with zero code change — over-claiming
+here would be the dishonest move. Provider = Claude per the project's AI-native steer + framework P11
+(build behind a swappable, simulated-by-default seam) so the agent system is fully buildable with no key.
+BOUNDARY: No AI code yet — this is the ratified plan. Metrics are honest estimates. The Claude seam,
+agent runtime, and tool registry are designed, not built (next epic after the gate).
+GATES: Docs-only increment; typecheck + build unaffected (last green this session). No code changed.
 
 ### BL-001 (2026-06-07) — Adopt the Autonomous Build Framework + kickoff alignment [foundation for all future work]
 WHAT: Committed `AUTONOMOUS_BUILD_FRAMEWORK.md` to repo root; augmented this Bible (in place) with
