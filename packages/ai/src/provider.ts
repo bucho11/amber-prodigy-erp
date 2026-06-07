@@ -13,6 +13,13 @@
 
 export type AiProviderKind = "simulated" | "claude";
 
+/**
+ * Model tiering (AGENTIC_AI_PLAYBOOK.md step 7): the agent loop runs on frontier Opus (judgment),
+ * while narrow side tasks (the LLM-judge, summarization) run on a cheaper/faster model. Haiku 4.5 is
+ * ~5x cheaper than Opus and ample for rubric-grading.
+ */
+export const FAST_MODEL = "claude-haiku-4-5";
+
 /** A tool the model may call (name + description + JSON Schema for the input). */
 export interface AiToolSpec {
   name: string;
