@@ -23,6 +23,12 @@ export async function listPendingApprovals(tenantId: string): Promise<AgentAppro
   return listAgentApprovals(tenantId, { status: "pending" });
 }
 
+/** Plain-language preview of what an approval would do (the "describe the impact" step, Rule 11). */
+export function approvalPreview(tool: string, input: unknown): string {
+  const t = getTool(tool);
+  return (t?.preview && t.preview(input)) || `Run ${tool}.`;
+}
+
 /** Recently decided approvals (executed / rejected / failed) — the agent-action history. */
 export async function listRecentDecidedApprovals(tenantId: string, limit = 25): Promise<AgentApproval[]> {
   return listAgentApprovals(tenantId, { decided: true, limit });

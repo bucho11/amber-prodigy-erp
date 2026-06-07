@@ -20,6 +20,7 @@ interface AgentApproval {
   status: string;
   actorName: string;
   createdAt: string;
+  preview?: string;
 }
 type AgentRun =
   | { status: "completed"; answer: string; steps: AgentStep[] }
@@ -199,8 +200,7 @@ export function Assistant() {
             {approvals.map((a) => (
               <li key={a.id} className="approval-item">
                 <div>
-                  <div className="approval-tool">{prettyTool(a.tool)}</div>
-                  <code className="approval-input">{JSON.stringify(a.input)}</code>
+                  <div className="approval-tool">{a.preview ?? prettyTool(a.tool)}</div>
                   <div className="muted small">
                     proposed by {a.actorName} · {new Date(a.createdAt).toLocaleString()}
                   </div>
@@ -235,8 +235,7 @@ export function Assistant() {
               return (
                 <li key={a.id} className="approval-item">
                   <div>
-                    <div className="approval-tool">{prettyTool(a.tool)}</div>
-                    <code className="approval-input">{JSON.stringify(a.input)}</code>
+                    <div className="approval-tool">{a.preview ?? prettyTool(a.tool)}</div>
                     <div className="muted small">{new Date(a.createdAt).toLocaleString()}</div>
                   </div>
                   <span className={`tag ${lbl.cls === "ok" ? "" : "muted-tag"}`}>{lbl.text}</span>

@@ -43,6 +43,12 @@ export interface AgentTool {
    * the orchestrator falls back to truncated JSON.
    */
   summarize?(result: unknown): string;
+  /**
+   * Optional: a plain-language preview of what this action WOULD do, from its input — shown to the
+   * human at the approval step (the "simulate-first / describe the impact" pattern, Rule 11). Write
+   * tools should provide this so the approver sees "Issue a $50.00 gift card", not raw JSON.
+   */
+  preview?(input: unknown): string;
 }
 
 /** Safe-to-expose tool shape (no handler) plus whether a given actor may call it. */

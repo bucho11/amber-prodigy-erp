@@ -7,8 +7,14 @@ import {
   listPendingApprovals,
   listRecentDecidedApprovals,
   decideApproval,
+  approvalPreview,
   type AgentActor,
 } from "@prodigy/agent";
+
+/** Attach a plain-language impact preview to each approval before sending to the client. */
+function withPreview<T extends { tool: string; input: unknown }>(a: T): T & { preview: string } {
+  return { ...a, preview: approvalPreview(a.tool, a.input) };
+}
 import { reqString, wrap } from "./http";
 import { requireAuth, userOf } from "./security";
 
@@ -60,7 +66,7 @@ export function registerAiRoutes(api: Router): void {
       // Persist any proposed-but-unapproved actions so a human can decide them durably.
       if (run.status === "needs_approval") {
         const approvals = [];
-        for (const p of run.pending) approvals.push(await requestApproval(actor, p.tool, p.input));
+        for (const p of run.pending) approvals.push(withPreview(await requestApproval(actor, p.tool, p.input)));
         res.json({ ...run, approvals });
         return;
       }
@@ -73,7 +79,7 @@ export function registerAiRoutes(api: Router): void {
     "/ai/approvals",
     requireAuth,
     wrap(async (req, res) => {
-      res.json({ approvals: await listPendingApprovals(actorOf(req).tenantId) });
+      res.json({ approvals: (await listPendingApprovals(actorOf(req).tenantId)).map(withPreview) });
     })
   );
 
@@ -82,7 +88,7 @@ export function registerAiRoutes(api: Router): void {
     "/ai/approvals/history",
     requireAuth,
     wrap(async (req, res) => {
-      res.json({ approvals: await listRecentDecidedApprovals(actorOf(req).tenantId) });
+      res.json({ approvals: (await listRecentDecidedApprovals(actorOf(req).tenantId)).map(withPreview) });
     })
   );
 

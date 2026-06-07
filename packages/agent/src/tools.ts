@@ -235,6 +235,10 @@ const TOOLS: AgentTool[] = [
       return { displayName: reqStr(i.displayName, "displayName"), email: optStr(i.email), phone: optStr(i.phone) };
     },
     handler: ({ actor }, input) => createClient(actor.tenantId, input as ClientInput),
+    preview: (input) => {
+      const i = input as { displayName: string; email: string | null };
+      return `Create a new client "${i.displayName}"${i.email ? ` (${i.email})` : ""}.`;
+    },
   },
   {
     name: "book_appointment",
@@ -275,6 +279,10 @@ const TOOLS: AgentTool[] = [
         roomId: string | null;
         notes: string | null;
       }),
+    preview: (input) => {
+      const i = input as { clientId: string; providerId: string; startsAt: string };
+      return `Book an appointment for client #${i.clientId} with provider #${i.providerId} at ${i.startsAt}.`;
+    },
   },
   {
     name: "add_soap_note",
@@ -319,6 +327,10 @@ const TOOLS: AgentTool[] = [
         assessment: string | null;
         plan: string | null;
       }),
+    preview: (input) => {
+      const i = input as { clientId: string; date: string };
+      return `Add a SOAP clinical note for client #${i.clientId} dated ${i.date}.`;
+    },
   },
   {
     name: "record_expense",
@@ -349,6 +361,10 @@ const TOOLS: AgentTool[] = [
     },
     handler: ({ actor }, input) =>
       recordExpense(actor.tenantId, input as { expenseAccountCode: string; amountCents: number; memo: string; date?: string }),
+    preview: (input) => {
+      const i = input as { expenseAccountCode: string; amountCents: number; memo: string };
+      return `Record a ${usd(i.amountCents)} expense to account ${i.expenseAccountCode} — "${i.memo}".`;
+    },
   },
   {
     name: "issue_gift_card",
@@ -368,6 +384,10 @@ const TOOLS: AgentTool[] = [
     },
     handler: ({ actor }, input) =>
       issueGiftCard(actor.tenantId, input as { amountCents: number; clientId: string | null; note: string | null }),
+    preview: (input) => {
+      const i = input as { amountCents: number; clientId: string | null };
+      return `Issue a ${usd(i.amountCents)} gift card${i.clientId ? ` to client #${i.clientId}` : ""}.`;
+    },
   },
 ];
 

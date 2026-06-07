@@ -4,7 +4,7 @@
  * existing db modules, input validation, and a tamper-evident audit trail (P9).
  */
 import { assert, assertEqual, TestRunner } from "../harness";
-import { executeTool, toolDefinitions, getTool, type AgentActor } from "@prodigy/agent";
+import { executeTool, toolDefinitions, getTool, approvalPreview, type AgentActor } from "@prodigy/agent";
 
 type Db = typeof import("@prodigy/db");
 
@@ -159,6 +159,12 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assert(ok.status === "ok" && (ok.result as { assessment: string | null }).assessment === "improving", "the note carries the assessment");
     const notes = await db.listSoapNotes(tenantId, c.id);
     assertEqual(notes.length, 1, "exactly one SOAP note persisted to the chart (the pending one never wrote)");
+  });
+
+  await t.test("approval previews describe the impact in plain language (simulate-first)", () => {
+    assertEqual(approvalPreview("issue_gift_card", { amountCents: 5000, clientId: null, note: null }), "Issue a $50.00 gift card.");
+    assertEqual(approvalPreview("record_expense", { expenseAccountCode: "6000", amountCents: 4000, memo: "towels" }), 'Record a $40.00 expense to account 6000 — "towels".');
+    assertEqual(approvalPreview("create_client", { displayName: "Jordan Lee", email: "j@x.io" }), 'Create a new client "Jordan Lee" (j@x.io).');
   });
 
   await t.test("read results are summarized human-readably (token-efficient context, not raw JSON)", async () => {
