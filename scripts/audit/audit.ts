@@ -151,14 +151,19 @@ async function main(): Promise<void> {
     const navScreens = ["Assistant", "Calendar", "Clients", "Checkout", "Books", "Inventory", "Reports", "Memberships", "Team & Roles", "Audit"];
     let n = 3;
     const num = (): string => String(n).padStart(2, "0");
+    const slugify = (s: string): string => s.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
     for (const label of navScreens) {
       if (!(await clickByText(label))) continue;
-      const slug = label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
-      await shoot(`${num()}-${slug}`);
+      await shoot(`${num()}-${slugify(label)}`);
       n++;
-      if (label === "Books" && (await clickByText("Expenses"))) {
-        await shoot(`${num()}-books-expenses`);
-        n++;
+      // Books has several subtabs (each a distinct financial screen) — capture them all for a11y.
+      if (label === "Books") {
+        for (const sub of ["Balance sheet", "Journal", "Bills", "Reconcile", "Expenses", "Chart of accounts"]) {
+          if (await clickByText(sub)) {
+            await shoot(`${num()}-books-${slugify(sub)}`);
+            n++;
+          }
+        }
       }
     }
 

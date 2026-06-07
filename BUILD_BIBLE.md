@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~38%** | **~88%** | **BL-033 — extend the live-audit to the financial UIs (raise the bar on what was built).** The audit covered Books' default + Expenses subtabs only, so the new Balance sheet / Bills / Reconcile UIs (BL-026/028/032) had no a11y coverage. Generalized the harness to capture every Books subtab → **19 screens (up from 14), all 0 axe violations.** Consolidation, not a feature: durable a11y coverage for the back-office surface I just shipped. |
 | 2026-06-07 | **~37%** | **~88%** | **BL-032 — Bank reconciliation (manual clearing).** Web-researched the cleared-vs-outstanding model. Added `cleared_at` to journal entries; `bankReconciliation(asOf)` splits cash transactions into cleared vs outstanding (book = cleared + outstanding; cleared should match the bank statement) and `setEntryCleared` toggles clearing (rejects non-cash entries). `GET /reports/bank-reconciliation`, `POST /journal/:id/cleared`, and a Books "Reconcile" subtab (tick transactions, enter statement balance → shows the difference). Test: book ties to the Balance Sheet cash, clearing updates the cleared balance, non-cash entries rejected. 58/58. |
 | 2026-06-07 | **~37%** | **~87%** | **BL-031 — Cash Flow statement (direct method) → the big-3 statements are complete.** Web-researched the method choice (direct is recommended for small/service businesses + exact given our transaction-level GL). `cashFlow(from,to)` categorizes every Cash-touching journal entry by its counterpart (revenue/expense/A-R/A-P/current-liability → Operating; equity → Financing; long-term assets → Investing) so the three sections sum exactly to the change in Cash. `cash_flow_statement` agent tool, `GET /reports/cash-flow`, Reports "Cash flow" section. Test asserts it reconciles (sections = net change = ending − beginning) AND ties to the Balance Sheet's Cash line. 56/56, eval 15 pass^1 100%. **P&L + Balance Sheet + Cash Flow all GL-derived and reconciling.** |
 | 2026-06-07 | **~36%** | **~86%** | **BL-030 — Accounts Receivable: accrual member dues + A/R aging (mirrors A/P).** Made membership dues **accrual**: invoicing posts Dr A/R (1200) / Cr Membership Revenue (4100); paying settles Dr Cash / Cr A/R — so the A/R aging reconciles to the Balance Sheet. New `receivablesAging(asOf)` with the standard buckets (Current / 1–30 / 31–60 / 61–90 / 90+, web-researched), `receivables_aging` agent tool, `GET /reports/receivables-aging`, and a Reports "Accounts receivable" section. 3 new money tests: dues accrue to A/R, aging total = ledger A/R, overdue bucketing, payment settles A/R, books balanced throughout. 55/55, eval 14 pass^1 100%. |
@@ -141,8 +142,10 @@ reality, not priors.
 - ~~**B2 — Live-audit harness**~~ ✅ **ACTIVE (BL-009)**: `scripts/audit/audit.ts` spins an ephemeral
   PG + boots the server, logs in via `setup-owner`, screenshots login/dashboard/assistant/public-booking
   with headless Chromium (`@sparticuz/chromium`), and runs axe (`@axe-core/puppeteer`); writes PNGs +
-  `findings.json` to `scripts/audit/out/` (gitignored). `npm run audit`. Extend to more screens/roles as
-  the UI grows. Known open finding (deferred to the UI overhaul): topnav overflow/wrap with 12 tabs.
+  `findings.json` to `scripts/audit/out/` (gitignored). `npm run audit`. **Now 19 screens** (BL-033 added
+  all Books subtabs: balance sheet, journal, bills, reconcile, expenses, chart of accounts — incl. the
+  new financial UIs). Extend to more roles as the UI grows. Known open finding (deferred to the UI
+  overhaul): topnav overflow/wrap with 12 tabs.
 - **B3 — UI / design-system overhaul** (NORTH_STAR workstream #1; starts after the gate).
 - **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
   superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
@@ -172,6 +175,22 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-033 (2026-06-07) — Extend the live-audit to the financial UIs [consolidation; raise the quality bar]
+WHAT: Generalized the audit harness's Books handling (`scripts/audit/audit.ts`) from "default tab +
+Expenses" to a loop over ALL Books subtabs (Balance sheet, Journal, Bills, Reconcile, Expenses, Chart of
+accounts), each screenshotted + axe-scanned. Audit now captures **19 screens (up from 14)**, all with 0
+axe violations.
+WHY/HOW: Over BL-026→032 I added a lot of UI (Balance sheet, Bills, Reconcile subtabs; Cash Flow + A/R
+Reports sections) but the audit only exercised two Books subtabs — so several financial screens I'd
+shipped had never been a11y-tested. (The Reports-page additions WERE covered, since the audit already
+navigates Reports and those sections render on that one page.) This increment is deliberately not a new
+feature: it's closing the verification gap on what was already built, keeping the "reliability bar on
+whatever you build" promise. Confirmed all the new financial UIs pass axe clean.
+BOUNDARY: Still owner-role only and the authed nav-driven screens; per-role audit passes (front_desk /
+accountant / read-only seeing the right gated subset) remain a follow-up. The known topnav-overflow
+finding is still deferred to the UI overhaul (B3). Audit remains a tracked score, not a blocking CI gate.
+GATES: build PASS, audit 19/19 screens 0 axe violations (was 14/14).
 
 ### BL-032 (2026-06-07) — Bank reconciliation (manual clearing) [B5; closes the cash story]
 WHAT: Added `cleared_at TIMESTAMPTZ` to `journal_entries` (self-healing `ALTER … ADD COLUMN IF NOT
