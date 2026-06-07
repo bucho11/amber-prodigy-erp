@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~26%** | **~72%** | **BL-016 — back-office depth: record_expense (agent-callable bookkeeping).** New `recordExpense` ledger fn (Dr expense acct / Cr Cash, balanced, validates account is expense-type) + `record_expense` agent tool (books.manage, approval). The agent can now do real bookkeeping with human sign-off. 38/38 green (verified: balanced entry, wrong-account rejected, books balance). |
 | 2026-06-07 | **~26%** | **~71%** | **BL-015 — agent-action history (governance/transparency).** `listAgentApprovals` gained a `decided` filter; new `listRecentDecidedApprovals` + `GET /api/ai/approvals/history`; Assistant now shows a "Recent agent actions" log (Approved & ran / Rejected / Failed) beneath the pending inbox. Owners can audit what the AI proposed and how it was decided. 37/37 green; audit re-run 0 axe violations. |
 | 2026-06-07 | **~26%** | **~70%** | **BL-014 — agent can BOOK appointments (safely).** New `bookAppointmentChecked` db fn (variant lookup → **double-booking guard** [`findConflict`, the same one the calendar uses] → create) + `book_appointment` agent tool (scheduling.manage, approval). The AI-receptionist capability the leaders lead with — but conflict-prevention is enforced (research: the hard requirement) and it's human-approved. 36/36 green (verified: conflict rejected, exactly one appt written). **Metric B crossed 70%.** |
 | 2026-06-07 | **~25%** | **~69%** | **BL-013 — agent gains a clinical WRITE tool (approval-gated).** `add_soap_note` (clinical.manage, approval) lets the agent draft a SOAP note into a client's chart — but it pauses for human sign-off (clinical = high-stakes) and runs under the approver's RBAC through the same `executeTool` path. An AI-charting capability (cf. Jane/Noterro). 35/35 green. `book_appointment` deferred to a dedicated increment because it needs the double-booking guard (research: conflict-prevention is non-negotiable for AI booking). |
@@ -143,6 +144,23 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-016 (2026-06-07) — Back-office depth: record_expense (agent-callable bookkeeping) [the agent keeps the books]
+WHAT: New `recordExpense(tenantId, {expenseAccountCode, amountCents, memo, date?})` in `ledger.ts` —
+posts a balanced journal entry Dr <expense account> / Cr Cash 1010 via `createJournalEntry`; validates
+the account exists AND is expense-type, and the amount is a positive integer. New `record_expense`
+agent tool (books.manage, approval). Tests: pauses without approval, RBAC-denied without books.manage,
+non-expense account rejected, approved post creates exactly one balanced entry and the trial balance
+still balances (38/38).
+WHY/HOW: Advances the back-office layer (one of the three the platform fuses) and gives the agent a
+real bookkeeping action — "record that we paid $X for Y" — through the existing double-entry GL (P7),
+gated by approval since it touches the books. Single safe entry point (no raw journal inserts from the
+agent). Account-type validation prevents nonsense like crediting an expense or debiting cash twice.
+BOUNDARY: Cash-basis simplification — every expense credits Cash 1010 (no A/P / unpaid-bill tracking;
+that's a fuller vendors/bills increment later). No expense categories beyond the seeded chart, no
+attachments/receipts, no recurring expenses. Not yet surfaced in the Books UI as a form (agent-only +
+the existing manual-journal UI); a dedicated expense form is a later UI increment.
+GATES: typecheck PASS, build PASS, test 38/38 PASS.
 
 ### BL-015 (2026-06-07) — Agent-action history in the Assistant [governance + transparency]
 WHAT: `listAgentApprovals` gained a `decided` filter (status <> 'pending'); new

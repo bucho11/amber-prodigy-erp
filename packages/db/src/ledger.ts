@@ -457,3 +457,31 @@ export async function postMembershipPayment(tenantId: string, invoiceId: string,
     ],
   });
 }
+
+/**
+ * Record an operating expense as a balanced journal entry: Dr <expense account> / Cr Cash 1010.
+ * The account must be an existing expense-type account (e.g. 6000 Operating Expenses, 6200 Rent).
+ * A safe, single entry point for "money went out" so the books stay balanced.
+ */
+export async function recordExpense(
+  tenantId: string,
+  input: { expenseAccountCode: string; amountCents: number; memo: string; date?: string }
+): Promise<JournalEntry> {
+  if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) throw new LedgerError("Amount must be a positive integer (cents).");
+  const accounts = await listAccounts(tenantId);
+  const expense = accounts.find((a) => a.code === input.expenseAccountCode);
+  if (!expense) throw new LedgerError(`No account with code '${input.expenseAccountCode}'.`);
+  if (expense.type !== "expense") throw new LedgerError(`Account ${expense.code} is not an expense account.`);
+  const cash = accounts.find((a) => a.code === "1010");
+  if (!cash) throw new LedgerError("Cash account (1010) is missing.");
+  return createJournalEntry(tenantId, {
+    entryDate: input.date ?? today(),
+    memo: input.memo,
+    sourceType: "expense",
+    sourceId: null,
+    lines: [
+      { accountId: expense.id, debitCents: input.amountCents, creditCents: 0 },
+      { accountId: cash.id, debitCents: 0, creditCents: input.amountCents },
+    ],
+  });
+}

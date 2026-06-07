@@ -97,6 +97,27 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assertEqual(out.status, "error", "non-ISO date rejected");
   });
 
+  await t.test("expense tool: approval-gated, RBAC-gated, posts a balanced journal entry", async () => {
+    const pending = await executeTool(owner, "record_expense", { expenseAccountCode: "6000", amountCents: 5000, memo: "office supplies" });
+    assertEqual(pending.status, "requires_approval", "unapproved expense pauses");
+
+    assertEqual((await executeTool(frontDesk, "record_expense", { expenseAccountCode: "6000", amountCents: 5000, memo: "x" }, { approved: true })).status, "denied", "front desk denied (no books.manage)");
+
+    // Wrong account type is rejected (1010 is an asset, not an expense).
+    const badAcct = await executeTool(owner, "record_expense", { expenseAccountCode: "1010", amountCents: 5000, memo: "x" }, { approved: true });
+    assertEqual(badAcct.status, "error", "non-expense account rejected");
+
+    const ok = await executeTool(owner, "record_expense", { expenseAccountCode: "6000", amountCents: 5000, memo: "office supplies" }, { approved: true });
+    assertEqual(ok.status, "ok", "approved expense posts");
+    const entries = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM journal_entries WHERE tenant_id = $1 AND source_type = 'expense'`,
+      [tenantId]
+    );
+    assertEqual(Number(entries[0].n), 1, "exactly one expense entry posted (pending + bad-account never wrote)");
+    const tb = await db.trialBalance(tenantId);
+    assertEqual(tb.totalDebitCents, tb.totalCreditCents, "books still balance after the expense");
+  });
+
   await t.test("booking tool: approval-gated, RBAC-gated, double-booking-guarded", async () => {
     const provider = (await db.query<{ id: string }>(`SELECT id::text AS id FROM staff_profiles WHERE tenant_id = $1 AND is_active LIMIT 1`, [tenantId]))[0];
     const variant = (await db.query<{ id: string }>(`SELECT id::text AS id FROM service_variants WHERE tenant_id = $1 ORDER BY id LIMIT 1`, [tenantId]))[0];

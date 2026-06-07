@@ -12,6 +12,7 @@ import {
   inventorySnapshot,
   createSoapNote,
   bookAppointmentChecked,
+  recordExpense,
   type ClientInput,
 } from "@prodigy/db";
 import type { AgentActor, AgentTool, ToolDefinition } from "./types";
@@ -280,6 +281,36 @@ const TOOLS: AgentTool[] = [
         assessment: string | null;
         plan: string | null;
       }),
+  },
+  {
+    name: "record_expense",
+    description:
+      "Record an operating expense (money paid out) to the books as a balanced journal entry — debits the expense account, credits Cash. WRITES to the ledger, so it requires human approval. Needs an expense account code (e.g. 6000 Operating Expenses, 6100 Merchant Fees, 6200 Rent & Facilities), an amount in cents, and a memo. Optional date (YYYY-MM-DD, defaults to today).",
+    permission: "books.manage",
+    risk: "approval",
+    inputSchema: {
+      type: "object",
+      properties: {
+        expenseAccountCode: { type: "string", description: "e.g. 6000, 6100, 6200, 6300" },
+        amountCents: { type: "integer" },
+        memo: { type: "string" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+      },
+      required: ["expenseAccountCode", "amountCents", "memo"],
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      const dateRaw = i.date;
+      return {
+        expenseAccountCode: reqStr(i.expenseAccountCode, "expenseAccountCode"),
+        amountCents: reqInt(i.amountCents, "amountCents", 1),
+        memo: reqStr(i.memo, "memo"),
+        date: dateRaw === undefined || dateRaw === null || dateRaw === "" ? undefined : reqDate(dateRaw, "date"),
+      };
+    },
+    handler: ({ actor }, input) =>
+      recordExpense(actor.tenantId, input as { expenseAccountCode: string; amountCents: number; memo: string; date?: string }),
   },
   {
     name: "issue_gift_card",
