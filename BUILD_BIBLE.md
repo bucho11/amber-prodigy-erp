@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~23%** | **~64%** | **BL-009 — live-audit harness activated + first a11y pass to ZERO.** `scripts/audit/audit.ts` now real: spins ephemeral PG + boots the server, logs in, screenshots login/dashboard/assistant/public-booking, runs axe. First pass found 4 serious + 5 moderate (contrast, missing `<main>`, no `<h1>`); fixed in a low-risk wave (darkened muted/accent tokens to WCAG-AA, added landmarks + an h1) → **re-run: 0 violations on all 4 screens** (objective numbers verified moved). Visually reviewed the renders. Next: NORTH_STAR #1 UI/design-system overhaul (incl. the topnav-overflow IA issue the audit surfaced). |
 | 2026-06-07 | **~22%** | **~62%** | **BL-008 — the agent reaches the app: "Ask Prodigy" + approvals inbox.** New `Assistant.tsx` (assistive-copilot pattern): chat → `/api/ai/agent`, transparent tool-step trail, live-vs-simulated badge, and a pending-approvals inbox with Approve/Reject wired to `/api/ai/approvals`. Added an Assistant nav tab (all users; agent only exposes each user's permitted tools). Runtime-smoked: server boots, `agent_approvals` self-heals on boot, all AI routes wired + 401-gated. Next: activate the live-audit harness (screenshots/axe) on the new screens, then UI/design-system overhaul. |
 | 2026-06-07 | **~21%** | **~58%** | **BL-007 — durable approval queue (human-in-the-loop complete).** New `agent_approvals` table + `@prodigy/db` persistence + `@prodigy/agent` workflow (request → list pending → approve/reject). Approve executes once under the approver's RBAC through `executeTool` (validated, real db path, audited); pending-guarded against double-execute. `/api/ai/agent` now persists proposed writes; `GET/POST /api/ai/approvals[/:id/approve|reject]`. 5 tests green (30/30). The agentic propose→approve→execute→audit loop is end-to-end. Next: the conversational UI surface + approvals inbox. |
 | 2026-06-07 | **~20%** | **~55%** | **BL-006 — the LLM agent loop (the differentiator runs).** Extended the provider seam for tool-use (text/tool_use/tool_result blocks; SimulatedAiProvider emits deterministic tool calls). New `runAgent` orchestrator: manual tool-use loop over the registry with research-backed guardrails — hard step cap + early-stopping synthesis, repeat-call detector, approval pauses. `POST /api/ai/agent` runs it (simulated until a key drops). 5 loop tests green (25/25). The Agentic OS now *operates*, end to end, with no key. Next: a persisted approval queue + the conversational UI surface. |
@@ -103,10 +104,11 @@ reality, not priors.
   daemon's pipes), applies the self-healing schema, runs the money-path suite (7/7) against live SQL,
   tears down. Type-gated via `test/tsconfig.json`. `npm test` + CI (`.github/workflows/ci.yml`,
   Postgres service via `TEST_DATABASE_URL`).
-- **B2 — Live-audit harness** *(scaffold landed BL-003; activation pending)*: `scripts/audit/audit.ts`
-  defines the Personas×Roles×Aspects matrix + route list and is inert until the headless-browser deps
-  are installed (`puppeteer-core` + `@sparticuz/chromium` + `@axe-core/puppeteer`). Activate when we
-  run the first live audit (after the UI overhaul has surfaces worth auditing).
+- ~~**B2 — Live-audit harness**~~ ✅ **ACTIVE (BL-009)**: `scripts/audit/audit.ts` spins an ephemeral
+  PG + boots the server, logs in via `setup-owner`, screenshots login/dashboard/assistant/public-booking
+  with headless Chromium (`@sparticuz/chromium`), and runs axe (`@axe-core/puppeteer`); writes PNGs +
+  `findings.json` to `scripts/audit/out/` (gitignored). `npm run audit`. Extend to more screens/roles as
+  the UI grows. Known open finding (deferred to the UI overhaul): topnav overflow/wrap with 12 tabs.
 - **B3 — UI / design-system overhaul** (NORTH_STAR workstream #1; starts after the gate).
 - **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
   superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
@@ -135,6 +137,27 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-009 (2026-06-07) — Live-audit harness activated + a11y wave to zero [run the app, don't just read it]
+WHAT: Replaced the inert audit scaffold with a working harness (`scripts/audit/audit.ts`): spins an
+ephemeral Postgres + boots `apps/api/dist`, drives headless Chromium (`@sparticuz/chromium` +
+`puppeteer-core`), logs in via `POST /api/auth/setup-owner`, screenshots login + dashboard + the new
+Assistant + public booking, runs `@axe-core/puppeteer` on each, and writes PNGs + `findings.json` to
+`scripts/audit/out/` (gitignored). First pass: 4 serious + 5 moderate axe violation types. Fixed in a
+low-risk wave: darkened `--muted` (#8a8178→#6e6358) and `--accent` (#9a6b4f→#8a5a3e) to clear WCAG-AA
+contrast on white and on accent-soft; wrapped login + public pages in `<main>` landmarks; promoted the
+brand to `<h1>` (with a CSS reset so it keeps its size). Re-ran → **0 violations on all 4 screens**.
+WHY/HOW: Framework Part 5 — static review misses contrast/landmark/heading issues; standing the app up
+and running axe gives objective numbers. Verified the deps could launch headless BEFORE building the
+harness (P1/P2) — a minimal launch+screenshot smoke first. Fixed objectively (re-ran to confirm the
+numbers moved, not just "looks fixed"). Reviewed the actual PNGs (Assistant + dashboard) for visual
+integrity after the token changes — design held.
+BOUNDARY: Audited 4 screens as the owner role only; per-role + more screens (checkout, books, clinical)
+come as the UI grows. Contrast fix was at the token level (covers most text); component one-offs would
+surface in future passes. The audit deps are devDeps (heavy) — `npm run audit` is manual, not in CI.
+Surfaced but DEFERRED to the UI overhaul: the topnav overflows/wraps with 12 tabs (structural IA, not a
+silent fix). Screenshots are artifacts (gitignored), not committed.
+GATES: typecheck PASS, build PASS, test 30/30 PASS, **axe 0 violations** (was 9 types).
 
 ### BL-008 (2026-06-07) — "Ask Prodigy" assistant + approvals inbox in the web app [the agent becomes usable]
 WHAT: New `apps/web/src/Assistant.tsx` — a conversational assistant screen: a message thread that

@@ -1,5 +1,5 @@
 :root {
-  --bg: #faf7f2; --ink: #2b2622; --muted: #8a8178; --accent: #9a6b4f; --accent-soft: #f1e7df;
+  --bg: #faf7f2; --ink: #2b2622; --muted: #6e6358; --accent: #8a5a3e; --accent-soft: #f1e7df;
   --ok: #3f7d52; --warn: #b07a2c; --bad: #b3503f; --card: #ffffff; --line: #ece5db;
 }
 * { box-sizing: border-box; }
@@ -11,7 +11,7 @@ body {
 /* top bar + tabs */
 .topbar { background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
 .topnav { max-width: 760px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.brand { font-weight: 700; letter-spacing: -0.01em; }
+.brand { font-weight: 700; letter-spacing: -0.01em; font-size: 16px; margin: 0; color: var(--ink); }
 .tabs { display: flex; gap: 4px; }
 .tab { border: 0; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 9px; font: inherit; cursor: pointer; }
 .tab:hover { color: var(--ink); }

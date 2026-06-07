@@ -35,19 +35,32 @@ function Root() {
   }
   // The client-facing booking + self-serve manage pages are fully public.
   if (typeof window !== "undefined" && window.location.pathname.startsWith("/book/manage")) {
-    return <PublicManageBooking />;
+    return (
+      <main className="public-main">
+        <PublicManageBooking />
+      </main>
+    );
   }
   if (typeof window !== "undefined" && window.location.pathname.startsWith("/book")) {
-    return <PublicBooking />;
+    return (
+      <main className="public-main">
+        <PublicBooking />
+      </main>
+    );
   }
   if (loading) {
     return (
-      <div className="centered">
+      <main className="centered">
         <p className="muted">Loading&hellip;</p>
-      </div>
+      </main>
     );
   }
-  if (!user) return <Login />;
+  if (!user)
+    return (
+      <main className="auth-main">
+        <Login />
+      </main>
+    );
   return <Shell />;
 }
 
@@ -88,7 +101,7 @@ function Shell() {
     <div className="page">
       <div className="topbar">
         <nav className="topnav">
-          <div className="brand">Prodigy ERP</div>
+          <h1 className="brand">Prodigy ERP</h1>
           <div className="tabs">
             <button className={effectiveTab === "dashboard" ? "tab active" : "tab"} onClick={() => setTab("dashboard")}>
               Dashboard
