@@ -1,12 +1,20 @@
 :root {
   --bg: #faf7f2; --ink: #2b2622; --muted: #6e6358; --accent: #8a5a3e; --accent-soft: #f1e7df;
   --ok: #3f7d52; --warn: #b07a2c; --bad: #b3503f; --card: #ffffff; --line: #ece5db;
+  --radius: 14px;
+  --shadow-sm: 0 1px 2px rgba(43, 38, 34, 0.06);
+  --shadow: 0 1px 2px rgba(43, 38, 34, 0.04), 0 6px 20px rgba(43, 38, 34, 0.05);
+  --ring: 0 0 0 3px rgba(138, 90, 62, 0.22);
 }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
   font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
+/* Keyboard focus is a quality gate (P12): a clear ring on every interactive element. */
+a:focus-visible, button:focus-visible, .nav-item:focus-visible, .input:focus-visible,
+.link-btn:focus-visible, [tabindex]:focus-visible { outline: none; box-shadow: var(--ring); border-radius: 8px; }
 
 /* App layout: left sidebar + content (modern SaaS shell; replaces the old wrapping topnav) */
 .app-layout { display: flex; min-height: 100vh; align-items: stretch; }
@@ -39,7 +47,7 @@ body {
 h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.01em; }
 .sub { color: var(--muted); margin: 0; }
 
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; margin: 24px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 24px; margin: 24px 0; box-shadow: var(--shadow); }
 .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 16px; }
 
 /* status list (dashboard) */
@@ -53,16 +61,18 @@ footer { font-size: 13px; text-align: center; margin-top: 16px; line-height: 1.5
 
 /* forms */
 .input { width: 100%; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 12px; font: inherit; color: var(--ink); }
-.input:focus { outline: none; border-color: var(--accent); }
+.input { transition: border-color .15s ease, box-shadow .15s ease; }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
 textarea.input { resize: vertical; margin-bottom: 12px; display: block; }
 .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .form-row .input { flex: 1; min-width: 160px; }
 .form-row .btn { white-space: nowrap; }
 
-.btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 9px 16px; border-radius: 10px; font: inherit; cursor: pointer; }
+.btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 9px 16px; border-radius: 10px; font: inherit; cursor: pointer; transition: border-color .15s ease, transform .12s ease, filter .15s ease, box-shadow .15s ease; }
 .btn:hover { border-color: var(--accent); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover { filter: brightness(0.96); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+.btn.primary:hover { filter: brightness(0.96); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
 .btn.sm { padding: 6px 12px; font-size: 14px; }
 .btn:disabled { opacity: .6; cursor: default; }
 

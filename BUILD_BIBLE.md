@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~24%** | **~67%** | **BL-011 — design-system polish: elevation, focus rings, button states.** Added `:root` design tokens (`--radius`, `--shadow`/`--shadow-sm`, `--ring`); soft card elevation, primary-button shadow + hover lift, input focus rings, font smoothing, and **keyboard `:focus-visible` rings on every interactive element** (P12). Global (no component JSX touched) → lifts every screen. Audit re-run: still **0 axe violations**; visually reviewed. Next: per-screen polish + feature depth. |
 | 2026-06-07 | **~24%** | **~66%** | **BL-010 — UI overhaul #1: sidebar navigation + layout shell.** Replaced the centered topnav (12 tabs overflowing/wrapping) with a modern grouped **left sidebar** (Front desk / Back office / Setup) + a wider content area — the standard premium-SaaS shell (Boulevard/Mangomint aesthetic). Preserved the `<main>` landmark + single `<h1>`; `aria-current` on the active item; responsive collapse. Audit re-run: **still 0 axe violations**, topnav-overflow finding resolved. Visually reviewed. Next: design-token/typography refinement + per-screen polish, then clinical/back-office depth. |
 | 2026-06-07 | **~23%** | **~64%** | **BL-009 — live-audit harness activated + first a11y pass to ZERO.** `scripts/audit/audit.ts` now real: spins ephemeral PG + boots the server, logs in, screenshots login/dashboard/assistant/public-booking, runs axe. First pass found 4 serious + 5 moderate (contrast, missing `<main>`, no `<h1>`); fixed in a low-risk wave (darkened muted/accent tokens to WCAG-AA, added landmarks + an h1) → **re-run: 0 violations on all 4 screens** (objective numbers verified moved). Visually reviewed the renders. Next: NORTH_STAR #1 UI/design-system overhaul (incl. the topnav-overflow IA issue the audit surfaced). |
 | 2026-06-07 | **~22%** | **~62%** | **BL-008 — the agent reaches the app: "Ask Prodigy" + approvals inbox.** New `Assistant.tsx` (assistive-copilot pattern): chat → `/api/ai/agent`, transparent tool-step trail, live-vs-simulated badge, and a pending-approvals inbox with Approve/Reject wired to `/api/ai/approvals`. Added an Assistant nav tab (all users; agent only exposes each user's permitted tools). Runtime-smoked: server boots, `agent_approvals` self-heals on boot, all AI routes wired + 401-gated. Next: activate the live-audit harness (screenshots/axe) on the new screens, then UI/design-system overhaul. |
@@ -138,6 +139,22 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-011 (2026-06-07) — Design-system polish: elevation, focus rings, button states [premium feel, global]
+WHAT: Added design tokens to `:root` (`--radius`, `--shadow-sm`, `--shadow`, `--ring`) and applied them
+globally: soft card elevation (`box-shadow` on `.card`), primary-button shadow + hover lift + active
+press, input focus rings, body font-smoothing, and a keyboard `:focus-visible` ring on every interactive
+element (links, buttons, nav items, inputs). All in `styles.css` — zero component JSX changed, so every
+screen benefits at once.
+WHY/HOW: The leaders (Boulevard/Mangomint) read "premium" largely through restrained elevation and
+crisp interaction states; tokenizing shadow/radius/ring makes that consistent and tunable. The
+`:focus-visible` rings are a real accessibility win (keyboard nav, P12) that axe doesn't auto-flag but
+the manual standard requires. Verified objectively (re-ran the audit: 0 axe violations) and visually
+(reviewed the Assistant render — cards now have subtle depth, buttons feel responsive).
+BOUNDARY: Global polish only — not a per-screen redesign; individual screens (checkout ticket, books
+tables, clinical forms) still get bespoke attention later. No web font added (system stack kept — avoids
+a network dependency the sandbox/audit can't load anyway). Light mode only; no theming system yet.
+GATES: typecheck PASS, build PASS, test 30/30 PASS, audit 0 axe violations.
 
 ### BL-010 (2026-06-07) — UI overhaul #1: sidebar navigation + layout shell [NORTH_STAR #1 begins]
 WHAT: Rebuilt the app shell (`apps/web/src/App.tsx` Shell) from a centered, wrapping topnav into a
