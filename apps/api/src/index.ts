@@ -37,6 +37,7 @@ import { registerReportRoutes } from "./routes-reports";
 import { registerMembershipRoutes } from "./routes-memberships";
 import { registerPublicRoutes } from "./routes-public";
 import { registerAuditRoutes } from "./routes-audit";
+import { registerAiRoutes } from "./routes-ai";
 
 const DEFAULT_TENANT_SLUG = "prodigy";
 
@@ -128,6 +129,9 @@ registerPublicRoutes(api);
 
 // Clinical-access audit log routes.
 registerAuditRoutes(api);
+
+// AI / Agentic-OS routes (status now; agent runtime + tools to follow).
+registerAiRoutes(api);
 
 // ---- Service catalog (authenticated; editing requires catalog.manage) ----
 api.get(

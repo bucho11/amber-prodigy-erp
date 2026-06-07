@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~18%** | **~46%** | **BL-004 — AI core foundation, step 1: provider seam.** `@prodigy/ai` (AiProvider interface + deterministic SimulatedAiProvider + ClaudeAiProvider behind one factory, model `claude-opus-4-8`); `/api/ai/status` surfaces live-vs-simulated; 5 seam tests green. The Agentic OS can now be built+tested with no key (P11). Next: agent runtime + audited tool registry. Research: modelled the agent surface on Zenoti's 9-agent "AI Workforce" + Mangomint Flows. |
 | 2026-06-07 | **~17%** | **~43%** | **BL-003 — reproducible gate landed.** Committed live-DB test harness (ephemeral Postgres, 7/7 money-path tests green), type-gated test code, GitHub Actions CI (typecheck+build+test), and an inert live-audit harness scaffold. B1 done. Small bump: the foundation is now verifiable + CI-guarded (de-risks everything downstream), but no user-facing feature shipped. Next: AI core foundation. |
 | 2026-06-07 | **~16%** | **~40%** | **Re-baseline (scope expanded, P6):** vision is now a *maximalist, end-to-end, Agentic-OS* platform — absorb every feature the wellness niche wants AND lead with an agentic AI layer (orchestrator + domain agents). The denominator grew a lot, so both % drop honestly even though no code regressed. The 20 shipped slices are unchanged; what's now "100%" is much bigger (full feature absorption + the whole agent system + UI overhaul + back-office/clinical depth). |
 | 2026-06-07 | **~22%** | **~60%** | Framework adopted; gates verified green. 20 slices shipped (foundation→POS→GL→inventory→reporting→memberships→public booking→clinical audit→self-serve manage). *(Superseded by the re-baseline above once the Agentic-OS vision was ratified.)* |
@@ -130,6 +131,29 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-004 (2026-06-07) — AI core foundation #1: the provider seam [the Agentic-OS differentiator begins]
+WHAT: New `@prodigy/ai` workspace package — `AiProvider` interface + types (`provider.ts`), a
+deterministic `SimulatedAiProvider` (`simulated.ts`), a live `ClaudeAiProvider` (`claude.ts`, model
+`claude-opus-4-8`, SDK lazy-imported), and one `createAiProvider()`/`aiStatus()` factory
+(`factory.ts`) that picks live-vs-simulated off `ANTHROPIC_API_KEY`. Wired `/api/ai/status`
+(authed) so the app shows whether AI is live or on the inert seam. Added 5 seam tests (now 12/12).
+WHY/HOW: Framework P11/A.4 — build the whole system behind inert, swappable integration abstractions
+so the entire Agentic OS is buildable+testable with no credential; the integration phase becomes a
+config-flip. Provider = Claude per the project's AI-native steer and the loaded claude-api skill
+(Opus 4.8, latest/most-capable). The SDK is a node_modules dep kept external by tsup and lazy-imported,
+so simulated mode never loads it. Research (framework "≥3 leaders"): modelled the eventual agent
+surface on **Zenoti's "AI Workforce"** (9 purpose-built agents — receptionist that books/follows-up,
+concierge running the lifecycle autonomously, smart gap-fill, churn→win-back, inventory forecast→
+reorder) and **Mangomint** (automation Flows + unified comms; strong automation, not truly agentic).
+Our wedge vs both: agents act through audited, permission-scoped tools across ALL THREE layers incl.
+real GL + clinical, with human-approval gates — a fusion neither leader offers.
+BOUNDARY: This is only the seam — no agent runtime, tool registry, memory, or approval gates yet
+(next increments). `ClaudeAiProvider.complete()` is typed + built but UNTESTED LIVE (no key in
+sandbox; api.anthropic.com unreachable) — only the simulated path and factory selection are exercised.
+Adaptive thinking (`thinking:{type:"adaptive"}`) is intentionally omitted from the create call until
+the live agent loop is wired and the SDK version is verified against it — noted to add then.
+GATES: typecheck PASS (incl. SDK types + new pkg), build PASS, test 12/12 PASS (7 money + 5 AI seam).
 
 ### BL-003 (2026-06-07) — Reproducible quality gate: live-DB test harness + CI + audit scaffold [closes the biggest framework gap]
 WHAT: Built `test/` — a zero-dependency runner (`harness.ts`) + an ephemeral-Postgres helper

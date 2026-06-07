@@ -10,6 +10,7 @@
   "dependencies": {
     "@prodigy/contracts": "*",
     "@prodigy/db": "*",
+    "@prodigy/ai": "*",
     "express": "^4.21.0",
     "pg": "^8.13.0"
   },

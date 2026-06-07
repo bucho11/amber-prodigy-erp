@@ -32,10 +32,12 @@ async function main(): Promise<void> {
     const db = (await import("@prodigy/db")) as typeof import("@prodigy/db");
     await db.initDb();
 
-    const suites = [await import("./suites/money.test")];
-    for (const suite of suites) {
-      await suite.run(db, t);
-    }
+    const moneySuite = await import("./suites/money.test");
+    await moneySuite.run(db, t);
+
+    // Provider-seam suite doesn't need the DB, but runs in the same harness for one gate.
+    const aiSuite = await import("./suites/ai.test");
+    await aiSuite.run(db, t);
     ok = t.summary();
   } finally {
     if (ephemeral) {
