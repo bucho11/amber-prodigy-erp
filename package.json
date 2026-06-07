@@ -5,13 +5,16 @@
   "workspaces": ["packages/*", "apps/*"],
   "engines": { "node": ">=20" },
   "scripts": {
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p test/tsconfig.json",
     "build": "npm run build -w @prodigy/web && npm run build -w @prodigy/api",
     "start": "node apps/api/dist/index.js",
-    "dev": "npm run build && npm run start"
+    "dev": "npm run build && npm run start",
+    "test": "tsx test/run.ts",
+    "audit": "tsx scripts/audit/audit.ts"
   },
   "devDependencies": {
     "typescript": "^5.6.2",
-    "@types/node": "^20.16.10"
+    "@types/node": "^20.16.10",
+    "tsx": "^4.19.2"
   }
 }

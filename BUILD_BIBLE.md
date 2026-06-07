@@ -23,11 +23,11 @@ BUILD LOG cadence, and live-audit harness on top.
 Stop to ask only on a genuine fork (scope, architecture, money/permission-model changes, anything
 outward-facing or irreversible). Otherwise keep momentum.
 
-**The gate (today):** `npm run typecheck` + `npm run build` — both verified GREEN 2026-06-07 on a
-fresh container (`npm install` → typecheck exit 0 → build exit 0). **Standing policy:** a committed,
-reproducible **live-DB test suite + CI** becomes part of "done" for every increment, built as
-Increment 1 (see backlog B1 / BL-001). Until that lands, typecheck+build is the hard gate and any
-live test run is noted in the BL entry.
+**The gate (today):** `npm run typecheck` + `npm run build` + `npm test` — all GREEN 2026-06-07.
+`npm test` (BL-003) stands up a **real ephemeral Postgres** and runs the money-path suite (7/7) against
+live SQL; CI (`.github/workflows/ci.yml`) runs typecheck+build+test on every push/PR against a Postgres
+service. **Standing policy:** every increment must clear typecheck + build + test before moving on (P2),
+and grow the suite for any money/clinical/permission path it touches.
 
 **Research mandate (ratified):** before every non-trivial feature or strategic call, web-research
 how ≥2–3 category leaders (per axis, see §0.3) solve it — architecture, UX, terminology, economics —
@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~17%** | **~43%** | **BL-003 — reproducible gate landed.** Committed live-DB test harness (ephemeral Postgres, 7/7 money-path tests green), type-gated test code, GitHub Actions CI (typecheck+build+test), and an inert live-audit harness scaffold. B1 done. Small bump: the foundation is now verifiable + CI-guarded (de-risks everything downstream), but no user-facing feature shipped. Next: AI core foundation. |
 | 2026-06-07 | **~16%** | **~40%** | **Re-baseline (scope expanded, P6):** vision is now a *maximalist, end-to-end, Agentic-OS* platform — absorb every feature the wellness niche wants AND lead with an agentic AI layer (orchestrator + domain agents). The denominator grew a lot, so both % drop honestly even though no code regressed. The 20 shipped slices are unchanged; what's now "100%" is much bigger (full feature absorption + the whole agent system + UI overhaul + back-office/clinical depth). |
 | 2026-06-07 | **~22%** | **~60%** | Framework adopted; gates verified green. 20 slices shipped (foundation→POS→GL→inventory→reporting→memberships→public booking→clinical audit→self-serve manage). *(Superseded by the re-baseline above once the Agentic-OS vision was ratified.)* |
 
@@ -92,12 +93,15 @@ reality, not priors.
   source to a public surface; every query tenant-scoped; every by-id mutation ownership-checked.
 
 ### 0.4 Deferred backlog (nothing silently dropped; B-NN)
-- **B1 — Committed test harness + CI** *(Increment 1, in progress)*: a reusable live-DB test runner
-  (ephemeral Postgres 16 cluster — available locally) + GitHub Actions (typecheck+build+test on every
-  push). The per-slice "live suites" cited throughout §7 were run ad-hoc and **never committed** — this
-  closes that gap so the test gate is reproducible.
-- **B2 — Live-audit harness** *(Increment 1 scaffold)*: seeded local instance + headless screenshots
-  + axe a11y pass (Appendix A.2/A.3 of the framework) so we audit by running the app, not reading it.
+- ~~**B1 — Committed test harness + CI**~~ ✅ **DONE (BL-003)**: `test/` runner spins an ephemeral
+  Postgres (drops to the `postgres` user via uid/gid; `pg_ctl -l` so spawnSync doesn't hang on the
+  daemon's pipes), applies the self-healing schema, runs the money-path suite (7/7) against live SQL,
+  tears down. Type-gated via `test/tsconfig.json`. `npm test` + CI (`.github/workflows/ci.yml`,
+  Postgres service via `TEST_DATABASE_URL`).
+- **B2 — Live-audit harness** *(scaffold landed BL-003; activation pending)*: `scripts/audit/audit.ts`
+  defines the Personas×Roles×Aspects matrix + route list and is inert until the headless-browser deps
+  are installed (`puppeteer-core` + `@sparticuz/chromium` + `@axe-core/puppeteer`). Activate when we
+  run the first live audit (after the UI overhaul has surfaces worth auditing).
 - **B3 — UI / design-system overhaul** (NORTH_STAR workstream #1; starts after the gate).
 - **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
   superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
@@ -126,6 +130,30 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-003 (2026-06-07) — Reproducible quality gate: live-DB test harness + CI + audit scaffold [closes the biggest framework gap]
+WHAT: Built `test/` — a zero-dependency runner (`harness.ts`) + an ephemeral-Postgres helper
+(`pg-ephemeral.ts`) + a money-path suite (`suites/money.test.ts`, 7 tests) + orchestrator (`run.ts`),
+wired as `npm test`. The suite drives REAL code against REAL SQL: POS totals + settlement GL posting,
+discount/tip → revenue/gratuities, refund reversal, gift-card issuance + redemption, package
+sale/redeem/restore, and tenant isolation (P9) — asserting the trial balance stays balanced at every
+checkpoint. Added `.github/workflows/ci.yml` (typecheck+build+test on every push/PR against a Postgres
+service via `TEST_DATABASE_URL`), type-gated the test code (`test/tsconfig.json`, folded into
+`npm run typecheck`), and scaffolded the inert live-audit harness (`scripts/audit/audit.ts`,
+`npm run audit`) defining the Personas×Roles×Aspects matrix + route list.
+WHY/HOW: The §7 "live suites" cited per-slice were ad-hoc and never committed — so "tests pass" wasn't
+reproducible, the single biggest gap vs framework P2. Now it is, and CI makes it automatic. Two real
+bugs found + fixed while standing it up: (1) Postgres refuses to run as root → drop to the `postgres`
+user via Node `{uid,gid}` (cleaner than `su`, which hung on PAM in this container); (2) `pg_ctl start`
+without `-l` lets the daemonized postmaster inherit spawnSync's stdout/stderr pipes, so spawnSync hangs
+forever waiting for EOF — fixed by redirecting the server log with `-l`. Forced `listen_addresses=127.0.0.1`
+so packages/db treats the test DB as local (no SSL).
+BOUNDARY: Suite covers the money paths first (highest cost-of-error, P4); other domains (scheduling,
+clinical, availability, booking) are not yet covered — grow per-increment. Audit harness is inert until
+its browser deps are installed (deliberate — keeps install/build/test light until there are surfaces
+worth auditing). Tests need a local Postgres (present here) or CI's service.
+GATES: typecheck PASS (incl. test/), build PASS, **test 7/7 PASS** against live Postgres, audit scaffold
+runs inert (exit 0). All green end-to-end.
 
 ### BL-002 (2026-06-07) — Ratify the maximalist Agentic-OS vision + re-baseline metrics [sets the whole architecture]
 WHAT: Recorded Bucho's expanded vision in §0.3 (maximalist end-to-end feature absorption + lead with
