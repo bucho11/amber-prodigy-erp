@@ -126,7 +126,7 @@ a.btn.block { padding: 10px 16px; }
 .member-actions { display: flex; align-items: center; gap: 10px; }
 .role-select { width: auto; min-width: 150px; }
 .role-badge { font-size: 13px; color: var(--accent); background: var(--accent-soft); padding: 5px 10px; border-radius: 8px; }
-.role-badge.full { color: var(--ok); background: #e9f3ec; }
+.role-badge.full { color: #2e6b43; background: #e9f3ec; }
 .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; background: var(--accent-soft); color: var(--accent); padding: 2px 7px; border-radius: 6px; }
 .tag.muted-tag { background: var(--line); color: var(--muted); }
 

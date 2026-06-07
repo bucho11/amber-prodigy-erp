@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~27%** | **~74%** | **BL-018 — audit coverage 4→14 screens; fixed 4 real a11y bugs.** Extended the live-audit harness to click through every authed nav screen (Calendar, Clients, Checkout, Books+Expenses, Inventory, Reports, Memberships, Team, Audit) + capture violation node targets. Surfaced + fixed: unlabeled date/provider selects (Calendar), unlabeled role selects + invite email (Team), low-contrast "Full access" badge — **14/14 screens now 0 axe violations**. 38/38 tests green. |
 | 2026-06-07 | **~26%** | **~73%** | **BL-017 — Expenses UI + API (humans, not just the agent).** `POST /api/expenses` (books.manage) + a one-click "Expenses" subtab/form in Books (pick expense account → amount → memo → date → balanced entry). Completes `recordExpense` across the stack (db→agent→API→UI). 38/38 green. |
 | 2026-06-07 | **~26%** | **~72%** | **BL-016 — back-office depth: record_expense (agent-callable bookkeeping).** New `recordExpense` ledger fn (Dr expense acct / Cr Cash, balanced, validates account is expense-type) + `record_expense` agent tool (books.manage, approval). The agent can now do real bookkeeping with human sign-off. 38/38 green (verified: balanced entry, wrong-account rejected, books balance). |
 | 2026-06-07 | **~26%** | **~71%** | **BL-015 — agent-action history (governance/transparency).** `listAgentApprovals` gained a `decided` filter; new `listRecentDecidedApprovals` + `GET /api/ai/approvals/history`; Assistant now shows a "Recent agent actions" log (Approved & ran / Rejected / Failed) beneath the pending inbox. Owners can audit what the AI proposed and how it was decided. 37/37 green; audit re-run 0 axe violations. |
@@ -145,6 +146,24 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-018 (2026-06-07) — Expand live-audit to 14 screens; fix 4 real a11y bugs [the audit harness pays off again]
+WHAT: Extended `scripts/audit/audit.ts` to click through every authenticated nav screen (Calendar,
+Clients, Checkout, Books + the Expenses subtab, Inventory, Reports, Memberships, Team & Roles, Audit)
+and capture each axe violation's node target + HTML snippet (for pinpointing). First expanded run found
+3 critical + 1 serious on screens never audited; fixed in a wave: added `aria-label`s to the Calendar
+toolbar date input + provider filter `<select>`, the Team invite email + role `<select>`s and the
+per-member role-change `<select>`; darkened the `.role-badge.full` text to clear WCAG-AA contrast.
+Re-ran → **14/14 screens at 0 axe violations**.
+WHY/HOW: BL-009's harness only covered 4 screens, so most of the app's a11y was unverified (a known
+boundary). Standing up + clicking through the real app surfaced unlabeled form controls — invisible to
+static review, real blockers for screen-reader/keyboard users (P12). Fixed objectively (re-ran to confirm
+0), and the harness now records node targets so future findings are directly actionable.
+BOUNDARY: Still owner-role only (per-role audits — e.g. what a front-desk user sees — are a later pass).
+Screens are captured in their default/empty state (no seeded appointments/sales), so data-dense layouts
+(a full calendar, a long ledger) aren't visually stress-tested yet. Booking/editor modals and sub-forms
+opened by buttons aren't auto-captured.
+GATES: typecheck PASS, build PASS, test 38/38 PASS, audit 14/14 screens 0 axe violations.
 
 ### BL-017 (2026-06-07) — Expenses UI + API: one-click expense entry in Books [the feature, human-usable]
 WHAT: `POST /api/expenses` (requireAuth + books.manage) → `recordExpense` (LedgerError already maps to

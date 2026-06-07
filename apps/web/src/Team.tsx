@@ -159,10 +159,11 @@ function InviteForm({ roles }: { roles: RoleWithPermissions[] }) {
           className="input"
           type="email"
           placeholder="Their email"
+          aria-label="Invite email address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <select className="input" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+        <select className="input" aria-label="Role for the invitee" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
           <option value="">Choose a role&hellip;</option>
           {roles.map((r) => (
             <option key={r.id} value={r.id}>
@@ -254,6 +255,7 @@ function MemberRow({
           ) : (
             <select
               className="input sm role-select"
+              aria-label={`Change role for ${member.displayName}`}
               value={member.role?.id ?? ""}
               disabled={busy}
               onChange={(e) => void changeRole(e.target.value)}

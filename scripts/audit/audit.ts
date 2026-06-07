@@ -27,7 +27,7 @@ export const ASPECTS = [
 const OUT_DIR = join(process.cwd(), "scripts/audit/out");
 const OWNER = { email: "audit-owner@prodigy.local", password: "AuditOwner!2026", displayName: "Audit Owner" };
 
-interface AxeViolation { id: string; impact: string | null; description: string; help: string; nodes: number }
+interface AxeViolation { id: string; impact: string | null; description: string; help: string; nodes: number; targets: { target: unknown; html: string }[] }
 interface ScreenFinding { screen: string; url: string; axeViolations: AxeViolation[] }
 
 async function loadDeps(): Promise<null | { puppeteer: any; chromium: any; AxePuppeteer: any }> {
@@ -113,6 +113,7 @@ async function main(): Promise<void> {
         const results = await new deps.AxePuppeteer(page).analyze();
         axeViolations = (results.violations as any[]).map((v) => ({
           id: v.id, impact: v.impact ?? null, description: v.description, help: v.help, nodes: v.nodes.length,
+          targets: (v.nodes as any[]).slice(0, 3).map((node) => ({ target: node.target, html: String(node.html ?? "").slice(0, 180) })),
         }));
       } catch (e) {
         console.error(`[audit] axe failed on ${screen}:`, (e as Error).message);
@@ -136,17 +137,34 @@ async function main(): Promise<void> {
     await page.goto(`${baseUrl}/`, { waitUntil: "networkidle2" });
     await shoot("02-dashboard");
 
-    // 3) The new AI Assistant screen.
-    const clickedAssistant = await page.evaluate(() => {
-      const btn = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Assistant");
-      if (btn) { (btn as HTMLButtonElement).click(); return true; }
-      return false;
-    });
-    if (clickedAssistant) await shoot("03-assistant");
+    // 3) Authenticated screens — click each sidebar nav item and capture it.
+    const clickByText = (text: string): Promise<boolean> =>
+      page.evaluate((t) => {
+        const btn = [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === t);
+        if (btn) {
+          (btn as HTMLButtonElement).click();
+          return true;
+        }
+        return false;
+      }, text);
 
-    // 4) Public client-facing booking page.
+    const navScreens = ["Assistant", "Calendar", "Clients", "Checkout", "Books", "Inventory", "Reports", "Memberships", "Team & Roles", "Audit"];
+    let n = 3;
+    const num = (): string => String(n).padStart(2, "0");
+    for (const label of navScreens) {
+      if (!(await clickByText(label))) continue;
+      const slug = label.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
+      await shoot(`${num()}-${slug}`);
+      n++;
+      if (label === "Books" && (await clickByText("Expenses"))) {
+        await shoot(`${num()}-books-expenses`);
+        n++;
+      }
+    }
+
+    // Public client-facing booking page.
     await page.goto(`${baseUrl}/book`, { waitUntil: "networkidle2" });
-    await shoot("04-public-booking");
+    await shoot(`${num()}-public-booking`);
   } finally {
     await browser.close();
     await instance.stop();

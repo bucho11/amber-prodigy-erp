@@ -106,8 +106,8 @@ export function ScheduleAdmin() {
           <button className="btn sm" onClick={() => shiftDay(1)}>
             Next ›
           </button>
-          <input className="input day-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <select className="input day-input" value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)}>
+          <input className="input day-input" type="date" aria-label="Day to view" value={date} onChange={(e) => setDate(e.target.value)} />
+          <select className="input day-input" aria-label="Filter by provider" value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)}>
             <option value="">All providers</option>
             {providers.map((p) => (
               <option key={p.id} value={p.id}>
