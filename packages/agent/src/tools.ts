@@ -12,6 +12,8 @@ import {
   balanceSheet,
   payablesSummary,
   listBills,
+  createBill,
+  payBill,
   inventorySnapshot,
   createSoapNote,
   bookAppointmentChecked,
@@ -253,6 +255,59 @@ const TOOLS: AgentTool[] = [
       if (bills.length === 0) return "No open bills — nothing owed to vendors right now.";
       return `${bills.length} open bill(s): ${bills.slice(0, 5).map((b) => `${b.vendorName} ${usd(b.amountCents)} due ${b.dueDate}`).join("; ")}${bills.length > 5 ? "; …" : ""}.`;
     },
+  },
+  {
+    name: "create_bill",
+    description:
+      "Enter an unpaid vendor bill into accounts payable — debits the expense account, credits Accounts Payable. WRITES to the books, so it requires human approval. Needs vendorId (look it up first), an expense account code (e.g. 6000, 6200), and amountCents. Optional billDate/dueDate (YYYY-MM-DD) and memo.",
+    permission: "books.manage",
+    risk: "approval",
+    inputSchema: {
+      type: "object",
+      properties: {
+        vendorId: { type: "string" },
+        expenseAccountCode: { type: "string", description: "e.g. 6000, 6100, 6200, 6300" },
+        amountCents: { type: "integer" },
+        billDate: { type: "string", description: "YYYY-MM-DD" },
+        dueDate: { type: "string", description: "YYYY-MM-DD" },
+        memo: { type: "string" },
+      },
+      required: ["vendorId", "expenseAccountCode", "amountCents"],
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return {
+        vendorId: reqStr(i.vendorId, "vendorId"),
+        expenseAccountCode: reqStr(i.expenseAccountCode, "expenseAccountCode"),
+        amountCents: reqInt(i.amountCents, "amountCents", 1),
+        billDate: optStr(i.billDate) ?? undefined,
+        dueDate: optStr(i.dueDate) ?? undefined,
+        memo: optStr(i.memo),
+      };
+    },
+    handler: ({ actor }, input) =>
+      createBill(actor.tenantId, input as { vendorId: string; expenseAccountCode: string; amountCents: number; billDate?: string; dueDate?: string; memo: string | null }),
+    preview: (input) => {
+      const i = input as { vendorId: string; expenseAccountCode: string; amountCents: number; memo: string | null };
+      return `Enter a ${usd(i.amountCents)} bill from vendor #${i.vendorId} to account ${i.expenseAccountCode}${i.memo ? ` — "${i.memo}"` : ""}.`;
+    },
+  },
+  {
+    name: "pay_bill",
+    description:
+      "Mark an open vendor bill as paid — debits Accounts Payable, credits Cash. WRITES to the books, so it requires human approval. Needs the billId of an open bill (look it up via list_unpaid_bills).",
+    permission: "books.manage",
+    risk: "approval",
+    inputSchema: {
+      type: "object",
+      properties: { billId: { type: "string" } },
+      required: ["billId"],
+      additionalProperties: false,
+    },
+    parse: (input) => ({ billId: reqStr((input as { billId?: unknown })?.billId, "billId") }),
+    handler: ({ actor }, input) => payBill(actor.tenantId, (input as { billId: string }).billId),
+    preview: (input) => `Pay open bill #${(input as { billId: string }).billId} (debit Accounts Payable, credit Cash).`,
   },
   {
     name: "inventory_snapshot",

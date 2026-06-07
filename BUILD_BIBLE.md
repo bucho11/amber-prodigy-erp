@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~35%** | **~85%** | **BL-029 — agent A/P write tools (create_bill, pay_bill) through the approval gate.** Brought the new A/P domain into the Agentic-OS: two approval-gated write tools with plain-language impact previews ("Enter a $1500.00 bill from vendor #7 to account 6200 — rent"). Gated test confirms no bill is created without sign-off + exact preview strings; eval `confirm-bill` scenario proves no unapproved write. 52/52, eval 13 pass^1 100%. |
 | 2026-06-07 | **~35%** | **~84%** | **BL-028 — Accounts Payable: vendors + bills (accrual A/P).** New domain: `vendors` + `bills` tables, `2000 Accounts Payable` account. Entering a bill posts Dr expense / Cr A/P; paying posts Dr A/P / Cr Cash — both atomic with the row (money path). End-to-end: contracts, `payables.ts` db module, `routes-payables.ts` (vendors/bills/pay/summary, `books.manage`/`financials.view`), `payables_summary` + `list_unpaid_bills` agent tools, and a Books "Bills" subtab (summary + open-bills list + Mark-paid + enter-bill w/ inline vendor add). New `payables.test.ts` (6 tests): A/P accrues + clears, books balanced throughout, reconciles to the Balance Sheet, double-pay + non-expense-account rejected. 51/51, audit clean, eval 12 runnable pass^1 100%. |
 | 2026-06-07 | **~33%** | **~83%** | **BL-027 — P&L upgraded to show Gross Profit (COGS → Gross Profit → Operating Expenses → Net Income).** Additive fields on `IncomeSummary` (`cogsCents`/`grossProfitCents`/`operatingExpenseCents`) derived from the 5xxx COGS account coding; Reports income statement now splits COGS from operating expenses and shows gross profit. Test asserts the sub-totals reconcile. Completes the core financial-statements trio (P&L + Balance Sheet). 45/45. |
 | 2026-06-07 | **~33%** | **~82%** | **BL-026 — Balance Sheet (the missing core financial statement).** Built `balanceSheet(tenantId, asOf)` from the GL — assets/liabilities/equity as of a date, with net-income-to-date folded into equity (no period-close yet) so the double-entry invariant holds. End-to-end: contracts type, db fn, `get_balance_sheet` agent tool, `GET /reports/balance-sheet`, and a Books "Balance sheet" subtab. Test asserts it **foots** (Assets = L + E, out-of-balance = 0) and that equity's net income equals the all-time P&L. With `incomeSummary` (P&L), the two core statements now exist — material progress on "replace QuickBooks." 45/45, audit 14/14, eval 11 runnable pass^1 100%. |
@@ -167,6 +168,26 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-029 (2026-06-07) — Agent A/P write tools: create_bill + pay_bill [agentic loop over the new domain]
+WHAT: Added two approval-gated agent write tools over BL-028's A/P: `create_bill` (vendorId,
+expenseAccountCode, amountCents, optional billDate/dueDate/memo) and `pay_bill` (billId). Both
+`risk: "approval"` + `books.manage`, with `preview()` formatters ("Enter a $1500.00 bill from vendor #7
+to account 6200 — \"rent\""; "Pay open bill #12 (debit Accounts Payable, credit Cash)."). A gated test
+asserts `executeTool("create_bill", …)` returns `requires_approval` with NO bill created, plus exact
+preview strings; an eval `confirm-bill` CONFIRM_ACTIONS scenario proves the loop never auto-executes the
+write. No new UI/routes (BL-028 already shipped those) — tools only.
+WHY/HOW: Completes the agentic story for A/P — the agent can now propose bills/payments (the
+differentiator), and they flow through the SAME approval queue + impact-preview infra (BL-024) and the
+SAME `createBill`/`payBill` db path (atomic GL posting) the UI uses. Reused every existing seam; net-new
+surface is two tool definitions. Kept reads (BL-028) and writes (here) split so the read tools shipped
+and were exercised first.
+BOUNDARY: Previews reference internal ids (vendor #7, bill #12) rather than resolved names — same
+limitation as the other previews (sync from input, no lookup); a name-resolving preview is the shared
+follow-up. The agent still can't create vendors (no `create_vendor` tool) — it must use an existing
+vendorId (look up via a vendor read; a `list_vendors` agent read tool is a small follow-up). Live
+behavioral adherence (does Claude actually look up the vendorId vs. guess?) is eval-pending a key.
+GATES: typecheck PASS, build PASS, test 52/52 PASS, eval 13 runnable pass^1 100% (confirm-bill ✓).
 
 ### BL-028 (2026-06-07) — Accounts Payable: vendors + bills [back-office pillar, B5; accrual GL]
 WHAT: New A/P domain. Schema: `vendors` and `bills` tables (self-healing) + a `2000 Accounts Payable`

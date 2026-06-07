@@ -4,6 +4,7 @@
  * the Balance Sheet: entering a bill raises A/P + expense; paying it lowers A/P + cash.
  */
 import { assert, assertEqual, TestRunner } from "../harness";
+import { executeTool, approvalPreview, type AgentActor } from "@prodigy/agent";
 
 type Db = typeof import("@prodigy/db");
 
@@ -100,5 +101,20 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
       threw = true;
     }
     assert(threw, "non-expense account rejected");
+  });
+
+  await t.test("agent A/P write tools are approval-gated (no bill created without sign-off)", async () => {
+    const owner: AgentActor = { tenantId, userId: "1", displayName: "Owner", isOwner: true, permissions: [] };
+    const before = (await db.listBills(tenantId, {})).length;
+    const out = await executeTool(owner, "create_bill", { vendorId, expenseAccountCode: "6000", amountCents: 9900, memo: "agent test" });
+    assertEqual(out.status, "requires_approval", "create_bill pauses for approval");
+    const after = (await db.listBills(tenantId, {})).length;
+    assertEqual(after, before, "no bill created while pending approval");
+    // Impact previews describe the action in plain language (Rule 11).
+    assertEqual(
+      approvalPreview("create_bill", { vendorId: "7", expenseAccountCode: "6200", amountCents: 150000, memo: "rent" }),
+      'Enter a $1500.00 bill from vendor #7 to account 6200 — "rent".'
+    );
+    assert(approvalPreview("pay_bill", { billId: "12" }).startsWith("Pay open bill #12"), "pay_bill preview names the bill");
   });
 }
