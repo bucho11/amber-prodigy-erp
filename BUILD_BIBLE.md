@@ -4,6 +4,113 @@
 > decision is made or a slice ships. This is how a fresh chat rebuilds context
 > after the conversation history is truncated.
 
+---
+
+## 0. Operating framework, live status & BUILD LOG (adopted 2026-06-07)
+
+### 0.1 Operating framework
+We operate under **`AUTONOMOUS_BUILD_FRAMEWORK.md`** (committed at repo root — read it in full).
+Its principles are binding: verify-before-build (P1); a per-increment quality gate (P2);
+depth-first to a real completion bar (P3); commit+push every increment as the only durable
+memory (P5); honest outcome reporting (P6); single source of truth (P7); additive & reversible
+by default (P8); security & tenancy are defaults not features (P9); boundary honesty *in the code*
+(P10); build the whole system with inert swappable integration seams (P11); a11y/UX/terminology
+as quality gates (P12). All prior Prodigy build discipline (below, §1–§10) still applies and is
+**consistent with** the framework — this section layers the framework's two-metric reporting,
+BUILD LOG cadence, and live-audit harness on top.
+
+**Per-increment loop:** verify-before-build → gate → commit+push → log a `BL-NNN` entry → next.
+Stop to ask only on a genuine fork (scope, architecture, money/permission-model changes, anything
+outward-facing or irreversible). Otherwise keep momentum.
+
+**The gate (today):** `npm run typecheck` + `npm run build` — both verified GREEN 2026-06-07 on a
+fresh container (`npm install` → typecheck exit 0 → build exit 0). **Standing policy:** a committed,
+reproducible **live-DB test suite + CI** becomes part of "done" for every increment, built as
+Increment 1 (see backlog B1 / BL-001). Until that lands, typecheck+build is the hard gate and any
+live test run is noted in the BL entry.
+
+**Research mandate (ratified):** before every non-trivial feature or strategic call, web-research
+how ≥2–3 category leaders (per axis, see §0.3) solve it — architecture, UX, terminology, economics —
+and cite what was modelled, in the BL entry. Owner wants this "to the highest degree." Model from
+reality, not priors.
+
+### 0.2 Two-metric completion tracker (newest first)
+> **Metric A — Overall (to real production for real users):** the full three-layer ERP serving
+> real tenants, *including* live external rails (card processing, SMS/email send, payroll ACH +
+> tax filing), runtime-verified money/data paths, and formal HIPAA/BAA where insurance billing is
+> live. Moves slowly and honestly; includes everything outside the container.
+> **Metric B — Build-ready (no external creds):** everything finishable in-container before the
+> regulated rails. B = 100% means "only Bucho's integration/provisioning work remains."
+
+| Date | Metric A (overall) | Metric B (build-ready) | Note |
+|------|--------------------|------------------------|------|
+| 2026-06-07 | **~22%** | **~60%** | Framework adopted; gates verified green. 20 slices shipped (foundation→POS→GL→inventory→reporting→memberships→public booking→clinical audit→self-serve manage). Remaining build-ready: committed test/audit harness, UI/design-system overhaul (NORTH_STAR #1), clinical depth, back-office depth (A/R, A/P, bank rec, statements, payroll calc), front-of-house polish, AI core. A is gated on rails + runtime money-path verification + HIPAA path. |
+
+### 0.3 Ratified alignment (kickoff 2026-06-07 — durable; do not re-litigate)
+- **Outcome & bar:** the reframed North Star (see `NORTH_STAR.md`) — the first wellness-vertical
+  platform that runs front-of-house like the best salon/spa software, charts+bills like the best
+  clinical software, and keeps books+payroll like real accounting software, AI-native, best-in-class
+  UI, in one system. "Done" overall = Metric A above (the project-wide Definition of DONE in
+  `PROJECT_STATE.md §1`, previously "TO CONFIRM", is hereby anchored to Metric A). Per-increment bar:
+  "a senior engineer would ship this" depth (P3) + the gate.
+- **The two metrics:** as defined in §0.2.
+- **Autonomy:** **FULL** — fix low-risk silently, build straight through the loop; propose only
+  genuine structural forks. Constant, extensive web-research modelling from industry leaders is
+  required to the highest degree (§0.1 research mandate).
+- **Gates:** typecheck + build now (green); committed live-DB test suite + CI added as Increment 1,
+  then part of every increment's "done" (Q3: "yes, test harness as an early increment").
+- **Git:** develop + commit + push **every increment** to `claude/autonomous-build-setup-saEZw`
+  (a change from prior slices, which pushed straight to `main`). No PR / nothing outward-facing
+  unless Bucho asks. Replit deploy loop unchanged (§5).
+- **Reference leaders (per axis):** front-of-house → **Boulevard, Mangomint** (+ Vagaro parity,
+  Zenoti "everything"); clinical → **Jane, ClinicSense, Noterro**; back-office → **CheckMark, Gusto**
+  (+ ADP); pricing/acquisition → Fresha; mobile/design → GlossGenius. Full landscape in `NORTH_STAR.md`.
+- **Hard constraints (LOCKED, from `NORTH_STAR.md`):** (1) regulated external rails — live card
+  processing, SMS/email **sending**, payroll tax filing / ACH — are activated **LAST**, right before
+  ship, and only with Bucho's own accounts (build the software around them earlier as inert seams).
+  (2) First workstream after the gate = UI/design-system overhaul. (3) Differentiate, don't just
+  clone. (4) Live code is truth; verify before claiming; honest caveats; never ship secrets/credentials/
+  source to a public surface; every query tenant-scoped; every by-id mutation ownership-checked.
+
+### 0.4 Deferred backlog (nothing silently dropped; B-NN)
+- **B1 — Committed test harness + CI** *(Increment 1, in progress)*: a reusable live-DB test runner
+  (ephemeral Postgres 16 cluster — available locally) + GitHub Actions (typecheck+build+test on every
+  push). The per-slice "live suites" cited throughout §7 were run ad-hoc and **never committed** — this
+  closes that gap so the test gate is reproducible.
+- **B2 — Live-audit harness** *(Increment 1 scaffold)*: seeded local instance + headless screenshots
+  + axe a11y pass (Appendix A.2/A.3 of the framework) so we audit by running the app, not reading it.
+- **B3 — UI / design-system overhaul** (NORTH_STAR workstream #1; starts after the gate).
+- **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
+  superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
+- **B5 — Back-office depth:** A/R, A/P + vendors + bill pay, bank reconciliation, financial statements
+  (Balance Sheet / P&L / Cash Flow), period close, payroll **calc** → paystubs → checks → 1099/W-2 prep
+  (ACH + filing rails-gated).
+- **B6 — Front-of-house polish:** deposits (Stripe-gated), waitlist, classes, website/branded app,
+  reviews/reputation, resources.
+- **B7 — AI core** (Bucho's differentiator) — where it first shows up, TBD.
+- **B8 — Comms/marketing engine** (campaigns, automations, templates, loyalty, AI copy) — built now,
+  **sending deferred** to the rails step.
+- **B-RAILS (owner-gated, activated LAST):** Stripe go-live, Twilio + A2P 10DLC, payroll ACH + tax
+  filing, formal HIPAA/BAA + electronic insurance billing, public-booking CAPTCHA/rate-limiting (infra).
+- **B-MERGE:** decide eventual merge/PR strategy for `claude/autonomous-build-setup-saEZw` → `main`
+  (prior slices were committed directly to `main`).
+
+### 0.5 BUILD LOG (newest first)
+<!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-001 (2026-06-07) — Adopt the Autonomous Build Framework + kickoff alignment [foundation for all future work]
+WHAT: Committed `AUTONOMOUS_BUILD_FRAMEWORK.md` to repo root; augmented this Bible (in place) with
+§0 — framework adoption, the two-metric tracker (A≈22% / B≈60%), ratified kickoff alignment, the
+deferred backlog (B1–B8 + rails), and this BUILD LOG. Ran the kickoff ritual; recorded Bucho's
+answers (full autonomy + heavy research mandate; gate-first; augment-in-place).
+WHY/HOW: This is a mature 20-slice project, not greenfield — the existing decision log (§1–§10) is the
+durable memory the framework prizes, so I augmented rather than overwrote (P7 single source of truth).
+Verified the gate actually runs before relying on it: fresh `npm install` → `npm run typecheck` exit 0
+→ `npm run build` exit 0.
+BOUNDARY: Committed/reproducible test suite + CI do not exist yet (the §7 "live suites" were ad-hoc,
+uncommitted) — that's Increment 1 (B1). Metrics are honest estimates, not instrument-measured.
+GATES: typecheck PASS (exit 0), build PASS (exit 0). No committed tests yet (by design — next increment).
+
 ## 1. What this is
 Prodigy ERP — a multi-tenant "wellness operating system" for clinical massage +
 esthetics + post-surgical lymphatic businesses. Tenant #1 is **Prodigy Massage and
