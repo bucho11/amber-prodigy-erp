@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~36%** | **~86%** | **BL-030 — Accounts Receivable: accrual member dues + A/R aging (mirrors A/P).** Made membership dues **accrual**: invoicing posts Dr A/R (1200) / Cr Membership Revenue (4100); paying settles Dr Cash / Cr A/R — so the A/R aging reconciles to the Balance Sheet. New `receivablesAging(asOf)` with the standard buckets (Current / 1–30 / 31–60 / 61–90 / 90+, web-researched), `receivables_aging` agent tool, `GET /reports/receivables-aging`, and a Reports "Accounts receivable" section. 3 new money tests: dues accrue to A/R, aging total = ledger A/R, overdue bucketing, payment settles A/R, books balanced throughout. 55/55, eval 14 pass^1 100%. |
 | 2026-06-07 | **~35%** | **~85%** | **BL-029 — agent A/P write tools (create_bill, pay_bill) through the approval gate.** Brought the new A/P domain into the Agentic-OS: two approval-gated write tools with plain-language impact previews ("Enter a $1500.00 bill from vendor #7 to account 6200 — rent"). Gated test confirms no bill is created without sign-off + exact preview strings; eval `confirm-bill` scenario proves no unapproved write. 52/52, eval 13 pass^1 100%. |
 | 2026-06-07 | **~35%** | **~84%** | **BL-028 — Accounts Payable: vendors + bills (accrual A/P).** New domain: `vendors` + `bills` tables, `2000 Accounts Payable` account. Entering a bill posts Dr expense / Cr A/P; paying posts Dr A/P / Cr Cash — both atomic with the row (money path). End-to-end: contracts, `payables.ts` db module, `routes-payables.ts` (vendors/bills/pay/summary, `books.manage`/`financials.view`), `payables_summary` + `list_unpaid_bills` agent tools, and a Books "Bills" subtab (summary + open-bills list + Mark-paid + enter-bill w/ inline vendor add). New `payables.test.ts` (6 tests): A/P accrues + clears, books balanced throughout, reconciles to the Balance Sheet, double-pay + non-expense-account rejected. 51/51, audit clean, eval 12 runnable pass^1 100%. |
 | 2026-06-07 | **~33%** | **~83%** | **BL-027 — P&L upgraded to show Gross Profit (COGS → Gross Profit → Operating Expenses → Net Income).** Additive fields on `IncomeSummary` (`cogsCents`/`grossProfitCents`/`operatingExpenseCents`) derived from the 5xxx COGS account coding; Reports income statement now splits COGS from operating expenses and shows gross profit. Test asserts the sub-totals reconcile. Completes the core financial-statements trio (P&L + Balance Sheet). 45/45. |
@@ -143,9 +144,10 @@ reality, not priors.
 - **B3 — UI / design-system overhaul** (NORTH_STAR workstream #1; starts after the gate).
 - **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
   superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
-- **B5 — Back-office depth:** A/R, ~~A/P + vendors~~ ✅ BL-028 (bill-pay ACH rails-gated), bank
-  reconciliation, financial statements (~~Balance Sheet~~ ✅ BL-026, P&L = `incomeSummary`, Cash Flow
-  pending), period close, payroll **calc** → paystubs → checks → 1099/W-2 prep (ACH + filing rails-gated).
+- **B5 — Back-office depth:** ~~A/R~~ ✅ BL-030 (accrual dues + aging), ~~A/P + vendors~~ ✅ BL-028
+  (bill-pay ACH rails-gated), bank reconciliation, financial statements (~~Balance Sheet~~ ✅ BL-026,
+  P&L = `incomeSummary`, Cash Flow pending), period close, cash-basis reporting toggle, payroll **calc**
+  → paystubs → checks → 1099/W-2 prep (ACH + filing rails-gated).
 - **B6 — Front-of-house polish:** deposits (Stripe-gated), waitlist, classes, website/branded app,
   reviews/reputation, resources.
 - **B7 — AI CORE / Agentic OS** *(the differentiator; epic — starts right after the gate)*:
@@ -168,6 +170,34 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-030 (2026-06-07) — Accounts Receivable: accrual member dues + aging [mirrors A/P; researched]
+WHAT: Made membership dues recognition **accrual** to give a real A/R. `postMembershipInvoiceAccrual`
+(Dr Accounts Receivable 1200 / Cr Membership Revenue 4100) now fires when an invoice is created
+(`subscribe` first invoice + `runBilling` recurring); `postMembershipPayment` changed from Dr Cash / Cr
+Revenue to **Dr Cash / Cr A/R** (settles the receivable — revenue was already recognized at accrual).
+New `receivablesAging(tenantId, asOf)` buckets outstanding dues by the standard aging set (Current /
+1–30 / 31–60 / 61–90 / 90+ days past due, aged from the dues period start) and returns per-invoice items
+with client name + days overdue. Wired end-to-end: `AgingBucket`/`ReceivableItem`/`ReceivablesAging`
+contracts, `receivables_aging` agent read tool, `GET /reports/receivables-aging?asOf=`, and a Reports
+"Accounts receivable" section (buckets + total + most-overdue line). 3 money tests assert dues accrue to
+A/R on invoice, the aging total **reconciles to the ledger's 1200 balance**, a 75-day invoice lands in
+61–90, payment settles A/R, and the trial balance stays balanced throughout.
+WHY/HOW: User said continue + use web research. Researched A/R aging conventions (standard 5 buckets;
+NetSuite/medical-billing) and dues revenue recognition (Novi AMS / ASAE: accrual orgs recognize dues +
+the receivable when invoiced since benefits start at term regardless of payment). That matches the
+Bible's "accrual is the internal truth" decision, and mirrors BL-028's A/P exactly (A/R is the
+asset-side twin of A/P). No existing tests asserted the old cash-basis membership posting, so the
+recognition change was a clean swap. Reused the GL primitives + idempotent `alreadyPosted` (distinct
+source types `membership_accrual` vs `membership_invoice` so accrual and payment don't collide).
+BOUNDARY: Membership revenue is now recognized in full at invoice time (not deferred ratably over the
+period) — a reasonable small-biz accrual simplification; true deferred-revenue + the cash-basis reporting
+TOGGLE (Bible §"accounting basis") are future. Existing pending invoices created before this change (none
+in a fresh DB; would exist in a migrated prod) would lack an accrual entry — a backfill is the migration
+step. A/R aging covers MEMBERSHIP dues only (the only A/R source today); other receivables (e.g. unpaid
+POS invoices) would extend it. Aged from period_start (the dues due date); UTC-day granularity. No
+dunning/automated reminders yet (sending is B-RAILS).
+GATES: typecheck PASS, build PASS, test 55/55 PASS, eval 14 runnable pass^1 100%, audit unchanged (Reports not in the covered set).
 
 ### BL-029 (2026-06-07) — Agent A/P write tools: create_bill + pay_bill [agentic loop over the new domain]
 WHAT: Added two approval-gated agent write tools over BL-028's A/P: `create_bill` (vendorId,

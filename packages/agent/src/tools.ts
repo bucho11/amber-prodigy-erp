@@ -14,6 +14,7 @@ import {
   listBills,
   createBill,
   payBill,
+  receivablesAging,
   inventorySnapshot,
   createSoapNote,
   bookAppointmentChecked,
@@ -308,6 +309,22 @@ const TOOLS: AgentTool[] = [
     parse: (input) => ({ billId: reqStr((input as { billId?: unknown })?.billId, "billId") }),
     handler: ({ actor }, input) => payBill(actor.tenantId, (input as { billId: string }).billId),
     preview: (input) => `Pay open bill #${(input as { billId: string }).billId} (debit Accounts Payable, credit Cash).`,
+  },
+  {
+    name: "receivables_aging",
+    description:
+      "Accounts-receivable aging: outstanding (unpaid) member dues grouped by how overdue they are (Current, 1–30, 31–60, 61–90, 90+ days). Call this for 'who owes us', 'accounts receivable', or 'overdue dues / collections' questions.",
+    permission: "financials.view",
+    risk: "auto",
+    inputSchema: { type: "object", properties: { asOf: { type: "string", description: "YYYY-MM-DD" } }, additionalProperties: false },
+    parse: (input) => ({ asOf: optDate((input as Record<string, unknown> | undefined)?.asOf, today()) }),
+    handler: ({ actor }, input) => receivablesAging(actor.tenantId, (input as { asOf: string }).asOf),
+    summarize: (r) => {
+      const a = r as { totalCents: number; totalCount: number; buckets: Array<{ label: string; cents: number }> };
+      if (a.totalCount === 0) return "Accounts receivable: nothing outstanding — all dues are paid up.";
+      const overdue = a.buckets.filter((b) => b.label !== "Current").reduce((s, b) => s + b.cents, 0);
+      return `A/R: ${usd(a.totalCents)} outstanding across ${a.totalCount} invoice(s)${overdue > 0 ? `, ${usd(overdue)} of it past due` : " (all current)"}.`;
+    },
   },
   {
     name: "inventory_snapshot",

@@ -1,6 +1,6 @@
 import { query, withTransaction } from "./index";
 import { getOrder, updateAdjustments } from "./payments";
-import { postMembershipPayment } from "./ledger";
+import { postMembershipPayment, postMembershipInvoiceAccrual } from "./ledger";
 import type { Membership, MembershipInvoice, MembershipPlan, Order } from "@prodigy/contracts";
 
 const iso = (v: string | Date): string => (v instanceof Date ? v.toISOString() : new Date(v).toISOString());
@@ -126,6 +126,7 @@ export async function subscribe(
   if (!plan.isActive) throw new MembershipError("That plan isn't active.");
   const start = input.startedOn ?? today();
   let id = "";
+  let invoiceId = "";
   await withTransaction(async (q) => {
     const m = await q<{ id: string }>(
       `INSERT INTO memberships (tenant_id, client_id, plan_id, status, price_cents, discount_bps, started_on, current_period_start, current_period_end)
@@ -134,12 +135,15 @@ export async function subscribe(
       [tenantId, input.clientId, input.planId, plan.priceCents, plan.discountBps, start]
     );
     id = m[0].id;
-    await q(
+    const inv = await q<{ id: string }>(
       `INSERT INTO membership_invoices (tenant_id, membership_id, period_start, period_end, amount_cents, status, paid_at)
-       VALUES ($1, $2::bigint, $3::date, ($3::date + interval '1 month')::date, $4, $5, $6)`,
+       VALUES ($1, $2::bigint, $3::date, ($3::date + interval '1 month')::date, $4, $5, $6) RETURNING id::text AS id`,
       [tenantId, id, start, plan.priceCents, plan.priceCents > 0 ? "pending" : "paid", plan.priceCents > 0 ? null : new Date().toISOString()]
     );
+    invoiceId = inv[0].id;
   });
+  // Accrue the receivable for the first (unpaid) dues invoice (accrual basis).
+  if (invoiceId && plan.priceCents > 0) await postMembershipInvoiceAccrual(tenantId, invoiceId, plan.priceCents, start);
   const m = await getMembership(tenantId, id);
   if (!m) throw new Error("failed to load created membership");
   return m;
@@ -228,6 +232,7 @@ export async function runBilling(tenantId: string): Promise<{ created: number }>
     [tenantId]
   );
   let created = 0;
+  const accruals: Array<{ invoiceId: string; amountCents: number; periodStart: string }> = [];
   await withTransaction(async (q) => {
     for (const m of due) {
       const exists = await q(
@@ -235,9 +240,9 @@ export async function runBilling(tenantId: string): Promise<{ created: number }>
         [tenantId, m.id, m.cpe]
       );
       if (exists.length) continue;
-      await q(
+      const inv = await q<{ id: string }>(
         `INSERT INTO membership_invoices (tenant_id, membership_id, period_start, period_end, amount_cents, status, paid_at)
-         VALUES ($1, $2::bigint, $3::date, ($3::date + interval '1 month')::date, $4, $5, $6)`,
+         VALUES ($1, $2::bigint, $3::date, ($3::date + interval '1 month')::date, $4, $5, $6) RETURNING id::text AS id`,
         [tenantId, m.id, m.cpe, m.price_cents, m.price_cents > 0 ? "pending" : "paid", m.price_cents > 0 ? null : new Date().toISOString()]
       );
       await q(
@@ -245,9 +250,12 @@ export async function runBilling(tenantId: string): Promise<{ created: number }>
          WHERE tenant_id = $1 AND id = $2`,
         [tenantId, m.id]
       );
+      if (m.price_cents > 0) accruals.push({ invoiceId: inv[0].id, amountCents: m.price_cents, periodStart: m.cpe });
       created++;
     }
   });
+  // Accrue each new dues invoice to Accounts Receivable (accrual basis).
+  for (const a of accruals) await postMembershipInvoiceAccrual(tenantId, a.invoiceId, a.amountCents, a.periodStart);
   return { created };
 }
 

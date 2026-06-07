@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import type { IncomeSummary, InventorySnapshot, SalesSummary } from "@prodigy/contracts";
+import type { IncomeSummary, InventorySnapshot, ReceivablesAging, SalesSummary } from "@prodigy/contracts";
 
 const fmt = (cents: number): string => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
 const todayStr = (): string => new Date().toISOString().slice(0, 10);
@@ -21,6 +21,7 @@ export function ReportsPage() {
   const [sales, setSales] = useState<SalesSummary | null>(null);
   const [income, setIncome] = useState<IncomeSummary | null>(null);
   const [inv, setInv] = useState<InventorySnapshot | null>(null);
+  const [aging, setAging] = useState<ReceivablesAging | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -28,14 +29,16 @@ export function ReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [s, i, v] = await Promise.all([
+      const [s, i, v, ar] = await Promise.all([
         api<{ salesSummary: SalesSummary }>(`/reports/sales?from=${f}&to=${t}`),
         api<{ incomeSummary: IncomeSummary }>(`/reports/income?from=${f}&to=${t}`),
         api<{ inventorySnapshot: InventorySnapshot }>(`/reports/inventory`),
+        api<{ aging: ReceivablesAging }>(`/reports/receivables-aging`),
       ]);
       setSales(s.salesSummary);
       setIncome(i.incomeSummary);
       setInv(v.inventorySnapshot);
+      setAging(ar.aging);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -210,7 +213,47 @@ export function ReportsPage() {
                 </tr>
               </tfoot>
             </table>
-            <p className="muted small">Reflects what&rsquo;s posted to the ledger in this range. Simplified, cash-basis-style books.</p>
+            <p className="muted small">Reflects what&rsquo;s posted to the ledger in this range, on an accrual basis (dues recognized when invoiced).</p>
+          </>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Accounts receivable</h2>
+        <p className="muted small">Outstanding member dues by age. Aged from the dues period start; reconciles to the ledger&rsquo;s A/R.</p>
+        {aging && aging.totalCount === 0 && <p className="muted small">Nothing outstanding &mdash; all dues are paid up.</p>}
+        {aging && aging.totalCount > 0 && (
+          <>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Age</th>
+                  <th className="num">Invoices</th>
+                  <th className="num">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aging.buckets.map((b) => (
+                  <tr key={b.label} className={b.cents === 0 ? "muted" : ""}>
+                    <td>{b.label}</td>
+                    <td className="num">{b.count || ""}</td>
+                    <td className="num">{b.cents ? fmt(b.cents) : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="total-row">
+                  <td>Total outstanding</td>
+                  <td className="num">{aging.totalCount}</td>
+                  <td className="num">{fmt(aging.totalCents)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            {aging.items.some((i) => i.daysPastDue > 0) && (
+              <p className="muted small">
+                Most overdue: {aging.items.filter((i) => i.daysPastDue > 0).slice(0, 3).map((i) => `${i.clientName} (${fmt(i.amountCents)}, ${i.daysPastDue}d)`).join("; ")}.
+              </p>
+            )}
           </>
         )}
       </section>

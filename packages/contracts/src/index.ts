@@ -607,6 +607,27 @@ export interface PayablesSummary {
   overdueCents: number;
 }
 
+// ---- Accounts receivable (outstanding member dues) aging ----
+export interface AgingBucket {
+  label: string; // Current | 1–30 days | 31–60 days | 61–90 days | 90+ days
+  count: number;
+  cents: number;
+}
+export interface ReceivableItem {
+  invoiceId: string;
+  clientName: string;
+  amountCents: number;
+  dueDate: string;
+  daysPastDue: number;
+}
+export interface ReceivablesAging {
+  asOf: string;
+  buckets: AgingBucket[];
+  items: ReceivableItem[];
+  totalCents: number;
+  totalCount: number;
+}
+
 
 // ---- Retail products / inventory ----
 export interface Product {

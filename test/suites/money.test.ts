@@ -244,4 +244,49 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assertEqual(inc.cogsCents + inc.operatingExpenseCents, inc.expenseCents, "COGS + opex = total expenses");
     assertEqual(inc.netIncomeCents, inc.grossProfitCents - inc.operatingExpenseCents, "net income = gross profit − opex");
   });
+
+  // ---- Accounts receivable: accrual membership dues + aging (BL-030) ----
+  const arBalance = async (): Promise<number> => {
+    const bs = await db.balanceSheet(tenantId, new Date().toISOString().slice(0, 10));
+    return bs.assets.find((a) => a.code === "1200")?.balanceCents ?? 0;
+  };
+
+  await t.test("membership dues accrue to A/R when invoiced; aging reconciles to the ledger", async () => {
+    const plan = await db.createPlan(tenantId, { name: "Monthly Wellness", priceCents: 9900, discountBps: 0, note: null });
+    const member = await db.createClient(tenantId, { displayName: "AR Member" });
+    const before = await arBalance();
+    await db.subscribe(tenantId, { clientId: member.id, planId: plan.id });
+    const after = await arBalance();
+    assertEqual(after - before, 9900, "A/R rose by the dues amount on accrual (Dr A/R / Cr Membership Revenue)");
+    await assertBalanced(db, tenantId, "after dues accrual");
+
+    const asOf = new Date().toISOString().slice(0, 10);
+    const aging = await db.receivablesAging(tenantId, asOf);
+    assertEqual(aging.totalCents, after, "A/R aging total reconciles to the ledger's Accounts Receivable balance");
+  });
+
+  await t.test("an overdue dues invoice lands in the correct aging bucket", async () => {
+    const plan = await db.createPlan(tenantId, { name: "Overdue Plan", priceCents: 5000, discountBps: 0, note: null });
+    const c = await db.createClient(tenantId, { displayName: "Overdue Member" });
+    const started = new Date(Date.now() - 75 * 86400000).toISOString().slice(0, 10);
+    await db.subscribe(tenantId, { clientId: c.id, planId: plan.id, startedOn: started });
+    const aging = await db.receivablesAging(tenantId, new Date().toISOString().slice(0, 10));
+    const item = aging.items.find((i) => i.clientName === "Overdue Member");
+    assert(item && item.daysPastDue >= 61 && item.daysPastDue <= 90, "a 75-day-old dues invoice is 61–90 days past due");
+    const b = aging.buckets.find((x) => x.label === "61–90 days");
+    assert(b && b.cents >= 5000, "the 61–90 bucket includes the overdue dues");
+  });
+
+  await t.test("paying a dues invoice settles A/R (Dr Cash / Cr A/R); books stay balanced", async () => {
+    const plan = await db.createPlan(tenantId, { name: "Pay Plan", priceCents: 7000, discountBps: 0, note: null });
+    const c = await db.createClient(tenantId, { displayName: "Paying Member" });
+    const m = await db.subscribe(tenantId, { clientId: c.id, planId: plan.id });
+    const invoices = await db.listMembershipInvoices(tenantId, m.id);
+    assert(invoices.length >= 1 && invoices[0].status === "pending", "a pending dues invoice exists");
+    const before = await arBalance();
+    await db.recordInvoicePayment(tenantId, invoices[0].id);
+    const after = await arBalance();
+    assertEqual(before - after, 7000, "A/R fell by the paid dues amount");
+    await assertBalanced(db, tenantId, "after dues payment");
+  });
 }

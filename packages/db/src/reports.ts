@@ -1,5 +1,5 @@
 import { query } from "./index";
-import type { BalanceSheet, BalanceSheetLine, IncomeLine, IncomeSummary, InventorySnapshot, LowStockItem, PaymentMethodTotal, SalesSummary } from "@prodigy/contracts";
+import type { AgingBucket, BalanceSheet, BalanceSheetLine, IncomeLine, IncomeSummary, InventorySnapshot, LowStockItem, PaymentMethodTotal, ReceivableItem, ReceivablesAging, SalesSummary } from "@prodigy/contracts";
 
 const n = (v: unknown): number => Number(v ?? 0);
 
@@ -156,6 +156,45 @@ export async function balanceSheet(tenantId: string, asOf: string): Promise<Bala
     outOfBalanceCents: outOfBalance,
     balanced: outOfBalance === 0,
   };
+}
+
+/**
+ * Accounts-receivable aging as of `asOf`: outstanding (unpaid) member dues invoices grouped into the
+ * standard buckets (Current / 1–30 / 31–60 / 61–90 / 90+ days past due), aged by the dues period start.
+ * Because dues now accrue to A/R when invoiced (accrual basis), the total here reconciles to the
+ * Balance Sheet's Accounts Receivable (1200) line.
+ */
+export async function receivablesAging(tenantId: string, asOf: string): Promise<ReceivablesAging> {
+  const rows = await query<{ invoice_id: string; client_name: string; amount_cents: number; due_date: string; days: number }>(
+    `SELECT mi.id::text AS invoice_id, c.display_name AS client_name, mi.amount_cents,
+            mi.period_start::text AS due_date, ($2::date - mi.period_start)::int AS days
+       FROM membership_invoices mi
+       JOIN memberships m ON m.id = mi.membership_id
+       JOIN clients c ON c.id = m.client_id
+      WHERE mi.tenant_id = $1 AND mi.status = 'pending'
+      ORDER BY mi.period_start`,
+    [tenantId, asOf]
+  );
+  const defs: Array<{ label: string; test: (d: number) => boolean }> = [
+    { label: "Current", test: (d) => d <= 0 },
+    { label: "1–30 days", test: (d) => d >= 1 && d <= 30 },
+    { label: "31–60 days", test: (d) => d >= 31 && d <= 60 },
+    { label: "61–90 days", test: (d) => d >= 61 && d <= 90 },
+    { label: "90+ days", test: (d) => d > 90 },
+  ];
+  const buckets: AgingBucket[] = defs.map((def) => ({ label: def.label, count: 0, cents: 0 }));
+  const items: ReceivableItem[] = [];
+  let totalCents = 0;
+  for (const r of rows) {
+    const d = Number(r.days);
+    const amt = n(r.amount_cents);
+    totalCents += amt;
+    const idx = defs.findIndex((def) => def.test(d));
+    buckets[idx].count++;
+    buckets[idx].cents += amt;
+    items.push({ invoiceId: r.invoice_id, clientName: r.client_name, amountCents: amt, dueDate: r.due_date, daysPastDue: Math.max(0, d) });
+  }
+  return { asOf, buckets, items, totalCents, totalCount: rows.length };
 }
 
 /** Current stock position (not date-ranged). */

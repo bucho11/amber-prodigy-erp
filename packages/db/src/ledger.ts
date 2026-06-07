@@ -440,19 +440,43 @@ export async function postOrderCOGS(tenantId: string, order: Order): Promise<voi
 }
 
 
-/** Recording a membership dues payment: cash in, membership revenue. */
+/** Settling a membership dues payment: cash in, draw down the receivable accrued at invoice time. */
 export async function postMembershipPayment(tenantId: string, invoiceId: string, amountCents: number): Promise<void> {
   if (amountCents <= 0) return;
   if (await alreadyPosted(tenantId, "membership_invoice", invoiceId)) return;
-  const ids = await accountIdsByCode(tenantId, ["1010", "4100"]);
+  // Revenue was recognized when the invoice was issued (postMembershipInvoiceAccrual); paying it
+  // just settles the receivable: Dr Cash (1010) / Cr Accounts Receivable (1200).
+  const ids = await accountIdsByCode(tenantId, ["1010", "1200"]);
   if (!ids) return;
   await createJournalEntry(tenantId, {
     entryDate: today(),
-    memo: `Membership dues — invoice #${invoiceId}`,
+    memo: `Membership dues paid — invoice #${invoiceId}`,
     sourceType: "membership_invoice",
     sourceId: invoiceId,
     lines: [
       { accountId: ids["1010"], debitCents: amountCents, creditCents: 0 },
+      { accountId: ids["1200"], debitCents: 0, creditCents: amountCents },
+    ],
+  });
+}
+
+/**
+ * Recognize membership dues when invoiced (accrual basis): Dr Accounts Receivable (1200) /
+ * Cr Membership Revenue (4100). The receivable sits on the Balance Sheet until paid, so the A/R
+ * aging reconciles to the ledger — mirroring how a bill accrues into Accounts Payable (BL-028).
+ */
+export async function postMembershipInvoiceAccrual(tenantId: string, invoiceId: string, amountCents: number, entryDate?: string): Promise<void> {
+  if (amountCents <= 0) return;
+  if (await alreadyPosted(tenantId, "membership_accrual", invoiceId)) return;
+  const ids = await accountIdsByCode(tenantId, ["1200", "4100"]);
+  if (!ids) return;
+  await createJournalEntry(tenantId, {
+    entryDate: entryDate ?? today(),
+    memo: `Membership dues invoiced — #${invoiceId}`,
+    sourceType: "membership_accrual",
+    sourceId: invoiceId,
+    lines: [
+      { accountId: ids["1200"], debitCents: amountCents, creditCents: 0 },
       { accountId: ids["4100"], debitCents: 0, creditCents: amountCents },
     ],
   });
