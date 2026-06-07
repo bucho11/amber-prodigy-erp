@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~27%** | **~75%** | **BL-019 — agent EVAL harness (evaluation-driven development).** Per Anthropic's agent guidance ("measure tool use, spot failures, iterate") + the eval literature (tool-selection accuracy is the core metric): added heuristic intent→tool routing to the simulated provider (smarter keyless demo + a deterministic stand-in for the model), and `scripts/eval/eval.ts` (`npm run eval`) scoring tool-selection across 15 realistic scenarios. **Baseline: 15/15 = 100%** (confirms tool names are discriminative); runs against live Claude when a key is set (the true measure). Metric B crossed 75%. |
 | 2026-06-07 | **~27%** | **~74%** | **BL-018 — audit coverage 4→14 screens; fixed 4 real a11y bugs.** Extended the live-audit harness to click through every authed nav screen (Calendar, Clients, Checkout, Books+Expenses, Inventory, Reports, Memberships, Team, Audit) + capture violation node targets. Surfaced + fixed: unlabeled date/provider selects (Calendar), unlabeled role selects + invite email (Team), low-contrast "Full access" badge — **14/14 screens now 0 axe violations**. 38/38 tests green. |
 | 2026-06-07 | **~26%** | **~73%** | **BL-017 — Expenses UI + API (humans, not just the agent).** `POST /api/expenses` (books.manage) + a one-click "Expenses" subtab/form in Books (pick expense account → amount → memo → date → balanced entry). Completes `recordExpense` across the stack (db→agent→API→UI). 38/38 green. |
 | 2026-06-07 | **~26%** | **~72%** | **BL-016 — back-office depth: record_expense (agent-callable bookkeeping).** New `recordExpense` ledger fn (Dr expense acct / Cr Cash, balanced, validates account is expense-type) + `record_expense` agent tool (books.manage, approval). The agent can now do real bookkeeping with human sign-off. 38/38 green (verified: balanced entry, wrong-account rejected, books balance). |
@@ -146,6 +147,29 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-019 (2026-06-07) — Agent evaluation harness: evaluation-driven development [measure the AI to improve it]
+WHAT: (1) Added heuristic intent→tool routing to `SimulatedAiProvider` — scores a prompt's distinctive
+words against each offered tool's name tokens and picks the best (keeps the `call:` directive as an
+override). This makes the keyless assistant actually route to tools (better demo) AND gives the eval a
+deterministic stand-in for the model. (2) New `scripts/eval/eval.ts` (`npm run eval`) — stands up the
+seeded instance, runs the agent over 15 realistic prompts, and scores TOOL-SELECTION ACCURACY (did it
+route to the right tool). Baseline against the heuristic: **15/15 = 100%**. Runs against live Claude
+when `ANTHROPIC_API_KEY` is set (the real measure).
+WHY/HOW: This is the directive to make the agentic AI operate at its highest capability — and the
+unanimous research answer is **evaluation-driven development**: Anthropic's "Building/Writing effective
+tools for agents" ("measure how Claude uses your tools, spot failure modes, iterate") and the agent-eval
+literature (T-Eval / trajectory evals; tool-selection + argument + trajectory are the core metrics).
+You can't improve what you don't measure — so we now have a capability score to track and gate against
+regressions. The eval doubles as a check that tool names are discriminative (Anthropic: "clear, distinct
+names"); a miss would flag an ambiguous name to fix. Sources: anthropic.com/research/building-effective-
+agents, anthropic.com/engineering/writing-tools-for-agents, confident-ai agent-eval guide, arxiv T-Eval.
+BOUNDARY: The simulated heuristic measures whether NAMES are discriminative, not the model's true
+reasoning — the real capability number comes from `ANTHROPIC_API_KEY=… npm run eval` (live Claude),
+which also exercises ARGUMENT correctness (the heuristic passes empty args). Eval scores selection only,
+not full trajectory/multi-step plans or argument accuracy yet (next eval iterations). It's a tracked
+quality signal (a score), not a blocking gate (like the audit harness). 15 scenarios — expand over time.
+GATES: typecheck PASS, build PASS, test 38/38 PASS, eval 15/15 (100%) on the simulated baseline.
 
 ### BL-018 (2026-06-07) — Expand live-audit to 14 screens; fix 4 real a11y bugs [the audit harness pays off again]
 WHAT: Extended `scripts/audit/audit.ts` to click through every authenticated nav screen (Calendar,

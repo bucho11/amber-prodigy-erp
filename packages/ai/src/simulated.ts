@@ -1,5 +1,36 @@
-import type { AiProvider, AiCompletionRequest, AiCompletionResult, AiContentBlock, AiToolCall } from "./provider";
+import type { AiProvider, AiCompletionRequest, AiCompletionResult, AiContentBlock, AiToolCall, AiToolSpec } from "./provider";
 import { CLAUDE_MODEL } from "./claude";
+
+// Generic function words that shouldn't drive tool selection.
+const STOPWORDS = new Set([
+  "the", "and", "for", "with", "what", "whats", "how", "much", "many", "this", "that", "please", "you",
+  "our", "are", "was", "were", "have", "has", "into", "from", "about", "want", "need", "can", "could",
+  "would", "should", "tell", "give", "any", "all", "out", "now", "today", "month", "week", "year", "their",
+]);
+
+/**
+ * Heuristic intent → tool router for the simulated provider: score the prompt's distinctive words
+ * against each offered tool's NAME tokens, pick the best. This makes the keyless assistant actually
+ * route to tools (a better demo) AND gives the eval harness a deterministic stand-in for the model's
+ * tool-selection — which doubles as a check that tool names are discriminative (Anthropic's guidance).
+ */
+function heuristicPick(text: string, tools: AiToolSpec[]): AiToolCall | null {
+  const words = (text.toLowerCase().match(/[a-z]+/g) ?? []).filter((w) => w.length >= 3 && !STOPWORDS.has(w));
+  let best: AiToolSpec | null = null;
+  let bestScore = 0;
+  for (const t of tools) {
+    const kws = t.name.toLowerCase().split(/[_\s]+/).filter((w) => w.length >= 3);
+    let score = 0;
+    for (const w of words) {
+      if (kws.some((k) => w === k || (w.length >= 4 && k.length >= 4 && (w.includes(k) || k.includes(w))))) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
+  }
+  return best && bestScore >= 1 ? { id: `sim_${best.name}_${text.length}`, name: best.name, input: {} } : null;
+}
 
 /** Stable id for the inert provider — surfaced in results so it's auditable. */
 export const SIMULATED_MODEL = "simulated-deterministic-v1";
@@ -60,12 +91,13 @@ export class SimulatedAiProvider implements AiProvider {
       );
     }
 
-    // 2) If a directive names an offered tool, emit that tool call.
+    // 2) Choose a tool: an explicit `call:<tool>` directive wins; otherwise route by heuristic intent.
     if (offered.size > 0 && last && last.role === "user") {
-      const directive = parseDirective(textOf(last.content), offered);
-      if (directive) {
-        return this.result("", [directive], req);
-      }
+      const promptText = textOf(last.content);
+      const directive = parseDirective(promptText, offered);
+      if (directive) return this.result("", [directive], req);
+      const picked = heuristicPick(promptText, req.tools ?? []);
+      if (picked) return this.result("", [picked], req);
     }
 
     // 3) Otherwise answer in text.
