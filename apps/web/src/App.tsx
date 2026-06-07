@@ -64,119 +64,100 @@ function Root() {
   return <Shell />;
 }
 
-type Tab = "dashboard" | "assistant" | "schedule" | "protocols" | "clients" | "checkout" | "memberships" | "books" | "inventory" | "reports" | "services" | "team" | "audit";
+type Tab =
+  | "dashboard"
+  | "assistant"
+  | "schedule"
+  | "protocols"
+  | "clients"
+  | "checkout"
+  | "memberships"
+  | "books"
+  | "inventory"
+  | "reports"
+  | "services"
+  | "team"
+  | "audit";
+
+type NavGroup = "Front desk" | "Back office" | "Setup";
 
 function Shell() {
   const { user, logout, hasPermission } = useAuth();
   const [tab, setTab] = useState<Tab>("dashboard");
   if (!user) return null; // Shell only renders when authenticated; this narrows the type.
-  const canSchedule = hasPermission("scheduling.view");
-  const canClients = hasPermission("clients.view");
-  const canCatalog = hasPermission("catalog.manage");
-  const canTeam = hasPermission("staff.manage") || hasPermission("roles.manage");
-  const canCheckout = hasPermission("pos.operate") || hasPermission("financials.view") || hasPermission("settings.manage");
-  const canBooks = hasPermission("financials.view") || hasPermission("books.manage");
-  const canInventory = hasPermission("inventory.view") || hasPermission("inventory.manage");
-  const canReports = hasPermission("reports.view");
-  const canMemberships = hasPermission("sales.manage");
-  const canAudit = hasPermission("settings.manage");
+
+  const can: Record<Tab, boolean> = {
+    dashboard: true,
+    assistant: true,
+    schedule: hasPermission("scheduling.view"),
+    protocols: hasPermission("scheduling.view"),
+    clients: hasPermission("clients.view"),
+    checkout: hasPermission("pos.operate") || hasPermission("financials.view") || hasPermission("settings.manage"),
+    books: hasPermission("financials.view") || hasPermission("books.manage"),
+    inventory: hasPermission("inventory.view") || hasPermission("inventory.manage"),
+    reports: hasPermission("reports.view"),
+    memberships: hasPermission("sales.manage"),
+    services: hasPermission("catalog.manage"),
+    team: hasPermission("staff.manage") || hasPermission("roles.manage"),
+    audit: hasPermission("settings.manage"),
+  };
 
   // Never render a tab the user can't access (e.g. after a permission change).
-  const effectiveTab: Tab =
-    (tab === "schedule" && !canSchedule) ||
-    (tab === "protocols" && !canSchedule) ||
-    (tab === "clients" && !canClients) ||
-    (tab === "checkout" && !canCheckout) ||
-    (tab === "books" && !canBooks) ||
-    (tab === "inventory" && !canInventory) ||
-    (tab === "reports" && !canReports) ||
-    (tab === "memberships" && !canMemberships) ||
-    (tab === "services" && !canCatalog) ||
-    (tab === "audit" && !canAudit) ||
-    (tab === "team" && !canTeam)
-      ? "dashboard"
-      : tab;
+  const effectiveTab: Tab = can[tab] ? tab : "dashboard";
+
+  const NAV: { tab: Tab; label: string; group: NavGroup }[] = [
+    { tab: "dashboard", label: "Dashboard", group: "Front desk" },
+    { tab: "assistant", label: "Assistant", group: "Front desk" },
+    { tab: "schedule", label: "Calendar", group: "Front desk" },
+    { tab: "protocols", label: "Protocols", group: "Front desk" },
+    { tab: "clients", label: "Clients", group: "Front desk" },
+    { tab: "checkout", label: "Checkout", group: "Front desk" },
+    { tab: "books", label: "Books", group: "Back office" },
+    { tab: "inventory", label: "Inventory", group: "Back office" },
+    { tab: "reports", label: "Reports", group: "Back office" },
+    { tab: "memberships", label: "Memberships", group: "Back office" },
+    { tab: "services", label: "Services & Rooms", group: "Setup" },
+    { tab: "team", label: "Team & Roles", group: "Setup" },
+    { tab: "audit", label: "Audit", group: "Setup" },
+  ];
+  const groups: NavGroup[] = ["Front desk", "Back office", "Setup"];
 
   return (
-    <div className="page">
-      <div className="topbar">
-        <nav className="topnav">
-          <h1 className="brand">Prodigy ERP</h1>
-          <div className="tabs">
-            <button className={effectiveTab === "dashboard" ? "tab active" : "tab"} onClick={() => setTab("dashboard")}>
-              Dashboard
-            </button>
-            <button className={effectiveTab === "assistant" ? "tab active" : "tab"} onClick={() => setTab("assistant")}>
-              Assistant
-            </button>
-            {canSchedule && (
-              <button className={effectiveTab === "schedule" ? "tab active" : "tab"} onClick={() => setTab("schedule")}>
-                Calendar
-              </button>
-            )}
-            {canSchedule && (
-              <button className={effectiveTab === "protocols" ? "tab active" : "tab"} onClick={() => setTab("protocols")}>
-                Protocols
-              </button>
-            )}
-            {canClients && (
-              <button className={effectiveTab === "clients" ? "tab active" : "tab"} onClick={() => setTab("clients")}>
-                Clients
-              </button>
-            )}
-            {canCheckout && (
-              <button className={effectiveTab === "checkout" ? "tab active" : "tab"} onClick={() => setTab("checkout")}>
-                Checkout
-              </button>
-            )}
-            {canBooks && (
-              <button className={effectiveTab === "books" ? "tab active" : "tab"} onClick={() => setTab("books")}>
-                Books
-              </button>
-            )}
-            {canInventory && (
-              <button className={effectiveTab === "inventory" ? "tab active" : "tab"} onClick={() => setTab("inventory")}>
-                Inventory
-              </button>
-            )}
-            {canReports && (
-              <button className={effectiveTab === "reports" ? "tab active" : "tab"} onClick={() => setTab("reports")}>
-                Reports
-              </button>
-            )}
-            {canMemberships && (
-              <button className={effectiveTab === "memberships" ? "tab active" : "tab"} onClick={() => setTab("memberships")}>
-                Memberships
-              </button>
-            )}
-            {canCatalog && (
-              <button className={effectiveTab === "services" ? "tab active" : "tab"} onClick={() => setTab("services")}>
-                Services &amp; Rooms
-              </button>
-            )}
-            {canTeam && (
-              <button className={effectiveTab === "team" ? "tab active" : "tab"} onClick={() => setTab("team")}>
-                Team &amp; Roles
-              </button>
-            )}
-            {canAudit && (
-              <button className={effectiveTab === "audit" ? "tab active" : "tab"} onClick={() => setTab("audit")}>
-                Audit
-              </button>
-            )}
-          </div>
-          <div className="user-menu">
-            <span className="user-name">
-              {user.displayName}
-              {user.role && <span className="user-role">{user.role.name}</span>}
-            </span>
-            <button className="link-btn muted" onClick={() => void logout()}>
-              Sign out
-            </button>
-          </div>
+    <div className="app-layout">
+      <aside className="sidebar">
+        <h1 className="brand">Prodigy ERP</h1>
+        <nav className="sidebar-nav" aria-label="Primary">
+          {groups.map((g) => {
+            const items = NAV.filter((n) => n.group === g && can[n.tab]);
+            if (items.length === 0) return null;
+            return (
+              <div className="nav-group" key={g}>
+                <div className="nav-group-label">{g}</div>
+                {items.map((n) => (
+                  <button
+                    key={n.tab}
+                    className={effectiveTab === n.tab ? "nav-item active" : "nav-item"}
+                    aria-current={effectiveTab === n.tab ? "page" : undefined}
+                    onClick={() => setTab(n.tab)}
+                  >
+                    {n.label}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </nav>
-      </div>
-      <main className="shell">
+        <div className="sidebar-user">
+          <span className="user-name">
+            {user.displayName}
+            {user.role && <span className="user-role">{user.role.name}</span>}
+          </span>
+          <button className="link-btn muted" onClick={() => void logout()}>
+            Sign out
+          </button>
+        </div>
+      </aside>
+      <main className="content">
         {effectiveTab === "dashboard" && <Dashboard />}
         {effectiveTab === "assistant" && <Assistant />}
         {effectiveTab === "schedule" && <ScheduleAdmin />}

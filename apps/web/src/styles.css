@@ -8,15 +8,32 @@ body {
   font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* top bar + tabs */
-.topbar { background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
-.topnav { max-width: 760px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.brand { font-weight: 700; letter-spacing: -0.01em; font-size: 16px; margin: 0; color: var(--ink); }
-.tabs { display: flex; gap: 4px; }
-.tab { border: 0; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 9px; font: inherit; cursor: pointer; }
-.tab:hover { color: var(--ink); }
-.tab.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+/* App layout: left sidebar + content (modern SaaS shell; replaces the old wrapping topnav) */
+.app-layout { display: flex; min-height: 100vh; align-items: stretch; }
+.sidebar { width: 232px; flex: none; background: var(--card); border-right: 1px solid var(--line); padding: 22px 16px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.brand { font-weight: 700; letter-spacing: -0.01em; font-size: 17px; margin: 0; color: var(--ink); padding: 0 8px; }
+.sidebar-nav { display: flex; flex-direction: column; gap: 18px; flex: 1; }
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 0 10px; margin-bottom: 4px; }
+.nav-item { border: 0; background: transparent; color: var(--ink); text-align: left; padding: 8px 10px; border-radius: 9px; font: inherit; cursor: pointer; }
+.nav-item:hover { background: var(--bg); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sidebar-user { border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.sidebar-user .user-name { align-items: flex-start; }
 
+.content { flex: 1; min-width: 0; width: 100%; max-width: 980px; margin: 0 auto; padding: 36px 32px 80px; }
+
+@media (max-width: 760px) {
+  .app-layout { flex-direction: column; }
+  .sidebar { width: auto; height: auto; position: static; border-right: 0; border-bottom: 1px solid var(--line); gap: 14px; }
+  .sidebar-nav { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .nav-group { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .nav-group-label { display: none; }
+  .sidebar-user { border-top: 0; padding-top: 0; flex-direction: row; align-items: center; justify-content: space-between; }
+  .content { padding: 24px 20px 64px; }
+}
+
+/* legacy single-column shell kept for any view still using it */
 .shell { max-width: 760px; margin: 0 auto; padding: 40px 24px 88px; }
 .eyebrow { letter-spacing: .12em; text-transform: uppercase; font-size: 12px; color: var(--accent); margin: 0 0 8px; }
 h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.01em; }

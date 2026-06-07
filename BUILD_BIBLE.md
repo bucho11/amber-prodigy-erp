@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~24%** | **~66%** | **BL-010 — UI overhaul #1: sidebar navigation + layout shell.** Replaced the centered topnav (12 tabs overflowing/wrapping) with a modern grouped **left sidebar** (Front desk / Back office / Setup) + a wider content area — the standard premium-SaaS shell (Boulevard/Mangomint aesthetic). Preserved the `<main>` landmark + single `<h1>`; `aria-current` on the active item; responsive collapse. Audit re-run: **still 0 axe violations**, topnav-overflow finding resolved. Visually reviewed. Next: design-token/typography refinement + per-screen polish, then clinical/back-office depth. |
 | 2026-06-07 | **~23%** | **~64%** | **BL-009 — live-audit harness activated + first a11y pass to ZERO.** `scripts/audit/audit.ts` now real: spins ephemeral PG + boots the server, logs in, screenshots login/dashboard/assistant/public-booking, runs axe. First pass found 4 serious + 5 moderate (contrast, missing `<main>`, no `<h1>`); fixed in a low-risk wave (darkened muted/accent tokens to WCAG-AA, added landmarks + an h1) → **re-run: 0 violations on all 4 screens** (objective numbers verified moved). Visually reviewed the renders. Next: NORTH_STAR #1 UI/design-system overhaul (incl. the topnav-overflow IA issue the audit surfaced). |
 | 2026-06-07 | **~22%** | **~62%** | **BL-008 — the agent reaches the app: "Ask Prodigy" + approvals inbox.** New `Assistant.tsx` (assistive-copilot pattern): chat → `/api/ai/agent`, transparent tool-step trail, live-vs-simulated badge, and a pending-approvals inbox with Approve/Reject wired to `/api/ai/approvals`. Added an Assistant nav tab (all users; agent only exposes each user's permitted tools). Runtime-smoked: server boots, `agent_approvals` self-heals on boot, all AI routes wired + 401-gated. Next: activate the live-audit harness (screenshots/axe) on the new screens, then UI/design-system overhaul. |
 | 2026-06-07 | **~21%** | **~58%** | **BL-007 — durable approval queue (human-in-the-loop complete).** New `agent_approvals` table + `@prodigy/db` persistence + `@prodigy/agent` workflow (request → list pending → approve/reject). Approve executes once under the approver's RBAC through `executeTool` (validated, real db path, audited); pending-guarded against double-execute. `/api/ai/agent` now persists proposed writes; `GET/POST /api/ai/approvals[/:id/approve|reject]`. 5 tests green (30/30). The agentic propose→approve→execute→audit loop is end-to-end. Next: the conversational UI surface + approvals inbox. |
@@ -137,6 +138,25 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-010 (2026-06-07) — UI overhaul #1: sidebar navigation + layout shell [NORTH_STAR #1 begins]
+WHAT: Rebuilt the app shell (`apps/web/src/App.tsx` Shell) from a centered, wrapping topnav into a
+**left sidebar** layout: brand `<h1>` on top, nav grouped into Front desk / Back office / Setup
+(driven by a `NAV` config + a `can` permission map, so gating logic is one place now), user + Sign out
+pinned at the bottom, and a `<main className="content">` area (max-width 980, up from 760). New CSS
+(`.app-layout`/`.sidebar`/`.nav-group`/`.nav-item`/`.content`) with a responsive collapse < 760px.
+WHY/HOW: The BL-009 audit surfaced the topnav overflowing/wrapping with 12 tabs — a real IA defect.
+Research (Boulevard/Mangomint/GlossGenius reviews) — the leaders win on clean, premium, app-like
+layouts; a grouped left sidebar is the category-standard fix and reads far more "operating system" than a
+row of tabs. Kept accessibility intact: single `<main>` landmark, single `<h1>`, `aria-current="page"`
+on the active item, `aria-label` on the nav. Verified objectively — re-ran the live-audit harness:
+**still 0 axe violations** on all 4 screens — and reviewed the rendered dashboard (grouped nav, active
+state, bottom user block; design holds). Also consolidated the old scattered `can*` flags into one map.
+BOUNDARY: Layout/nav only — this is the first UI increment, not the full design-system overhaul
+(typography scale, spacing tokens, component polish, dark mode, brand identity come next). The old
+`.shell`/`.tab` CSS is left in place (harmless, unused) rather than churned out. Mobile collapse is
+functional but not deeply tuned. Screens themselves are unchanged inside the new content area.
+GATES: typecheck PASS, build PASS, test 30/30 PASS, audit 0 axe violations (topnav-overflow resolved).
 
 ### BL-009 (2026-06-07) — Live-audit harness activated + a11y wave to zero [run the app, don't just read it]
 WHAT: Replaced the inert audit scaffold with a working harness (`scripts/audit/audit.ts`): spins an
