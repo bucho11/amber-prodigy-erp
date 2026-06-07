@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { useAuth } from "./auth";
-import type { Account, AccountType, BalanceSheet, Bill, JournalEntry, JournalEntryListItem, PayablesSummary, TrialBalance, Vendor } from "@prodigy/contracts";
+import type { Account, AccountType, BalanceSheet, BankReconciliation, Bill, JournalEntry, JournalEntryListItem, PayablesSummary, TrialBalance, Vendor } from "@prodigy/contracts";
 
 const fmt = (cents: number): string => {
   const v = (Math.abs(cents) / 100).toFixed(2);
@@ -20,7 +20,7 @@ const SOURCE_LABEL: Record<string, string> = {
 export function BooksPage() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission("books.manage");
-  const [tab, setTab] = useState<"trial" | "balance" | "journal" | "bills" | "expense" | "accounts">("trial");
+  const [tab, setTab] = useState<"trial" | "balance" | "journal" | "bills" | "reconcile" | "expense" | "accounts">("trial");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const loadAccounts = () => api<{ accounts: Account[] }>("/accounts").then((r) => setAccounts(r.accounts)).catch(() => {});
   useEffect(() => {
@@ -42,6 +42,9 @@ export function BooksPage() {
         <button className={tab === "bills" ? "subtab active" : "subtab"} onClick={() => setTab("bills")}>
           Bills
         </button>
+        <button className={tab === "reconcile" ? "subtab active" : "subtab"} onClick={() => setTab("reconcile")}>
+          Reconcile
+        </button>
         {canWrite && (
           <button className={tab === "expense" ? "subtab active" : "subtab"} onClick={() => setTab("expense")}>
             Expenses
@@ -55,6 +58,7 @@ export function BooksPage() {
       {tab === "balance" && <BalanceSheetView />}
       {tab === "journal" && <JournalView accounts={accounts} canWrite={canWrite} />}
       {tab === "bills" && <BillsView accounts={accounts} canWrite={canWrite} />}
+      {tab === "reconcile" && <ReconcileView canWrite={canWrite} />}
       {tab === "expense" && canWrite && <ExpensesView accounts={accounts} />}
       {tab === "accounts" && <AccountsView accounts={accounts} canWrite={canWrite} onChange={loadAccounts} />}
     </>
@@ -105,6 +109,112 @@ function TrialBalanceView() {
             </tr>
           </tfoot>
         </table>
+      )}
+    </section>
+  );
+}
+
+function ReconcileView({ canWrite }: { canWrite: boolean }) {
+  const [rec, setRec] = useState<BankReconciliation | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [stmt, setStmt] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = () =>
+    api<{ reconciliation: BankReconciliation }>("/reports/bank-reconciliation")
+      .then((r) => setRec(r.reconciliation))
+      .catch((e) => setError((e as Error).message));
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const toggle = async (entryId: string, cleared: boolean) => {
+    setBusy(entryId);
+    setError(null);
+    try {
+      await api(`/journal/${entryId}/cleared`, "POST", { cleared });
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const stmtCents = stmt ? dollarsToCents(stmt) : null;
+  const diff = rec && stmtCents !== null ? stmtCents - rec.clearedBalanceCents : null;
+
+  return (
+    <section className="card">
+      <h2>Bank reconciliation</h2>
+      <p className="muted small">
+        Tick each transaction the bank has posted. The <strong>cleared</strong> balance should match your bank statement; anything
+        unticked is still outstanding (in transit).
+      </p>
+      {error && <p className="bad small">{error}</p>}
+      {!rec && !error && <p className="muted">Loading&hellip;</p>}
+      {rec && (
+        <>
+          <div className="totals">
+            <div className="totline">
+              <span className="muted small">Book balance (ledger)</span>
+              <span>{fmt(rec.bookBalanceCents)}</span>
+            </div>
+            <div className="totline">
+              <span className="muted small">Cleared balance</span>
+              <span>{fmt(rec.clearedBalanceCents)}</span>
+            </div>
+            <div className="totline">
+              <span className="muted small">Outstanding ({rec.unclearedCount})</span>
+              <span>{fmt(rec.unclearedCents)}</span>
+            </div>
+          </div>
+          <div className="form-row" style={{ alignItems: "flex-end" }}>
+            <label className="field" style={{ maxWidth: 220 }}>
+              <span>Bank statement balance</span>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <span className="dollar">$</span>
+                <input className="input" inputMode="decimal" value={stmt} onChange={(e) => setStmt(e.target.value)} placeholder="optional" />
+              </div>
+            </label>
+            {diff !== null && (
+              <p className={diff === 0 ? "muted small" : "bad"} style={{ marginBottom: 8 }}>
+                {diff === 0 ? "✓ Reconciled — cleared balance matches the statement." : `Off by ${fmt(Math.abs(diff))} vs. cleared balance.`}
+              </p>
+            )}
+          </div>
+          {rec.transactions.length === 0 && <p className="muted small">No cash transactions yet.</p>}
+          {rec.transactions.length > 0 && (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Cleared</th>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th className="num">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rec.transactions.map((tx) => (
+                  <tr key={tx.entryId} className={tx.cleared ? "" : ""}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={tx.cleared}
+                        disabled={!canWrite || busy === tx.entryId}
+                        onChange={(e) => void toggle(tx.entryId, e.target.checked)}
+                        aria-label={`Mark ${tx.memo || "transaction"} cleared`}
+                      />
+                    </td>
+                    <td className="muted small">{tx.date}</td>
+                    <td>{tx.memo || <span className="muted small">Cash transaction</span>}</td>
+                    <td className="num">{fmt(tx.amountCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
     </section>
   );

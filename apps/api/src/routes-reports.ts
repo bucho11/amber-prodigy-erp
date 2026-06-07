@@ -1,5 +1,5 @@
 import type { Router } from "express";
-import { salesSummary, incomeSummary, balanceSheet, cashFlow, receivablesAging, inventorySnapshot } from "@prodigy/db";
+import { salesSummary, incomeSummary, balanceSheet, cashFlow, receivablesAging, bankReconciliation, inventorySnapshot } from "@prodigy/db";
 import { ValidationError, optString, wrap } from "./http";
 import { requireAuth, requirePermission, userOf } from "./security";
 
@@ -64,6 +64,17 @@ export function registerReportRoutes(api: Router): void {
       const asOf = optString(req.query.asOf) ?? new Date().toISOString().slice(0, 10);
       if (!DATE_RE.test(asOf)) throw new ValidationError("asOf must be YYYY-MM-DD.");
       res.json({ aging: await receivablesAging(userOf(req).tenantId, asOf) });
+    })
+  );
+
+  api.get(
+    "/reports/bank-reconciliation",
+    requireAuth,
+    requirePermission("financials.view"),
+    wrap(async (req, res) => {
+      const asOf = optString(req.query.asOf);
+      if (asOf !== undefined && !DATE_RE.test(asOf)) throw new ValidationError("asOf must be YYYY-MM-DD.");
+      res.json({ reconciliation: await bankReconciliation(userOf(req).tenantId, asOf) });
     })
   );
 

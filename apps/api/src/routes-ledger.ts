@@ -8,6 +8,7 @@ import {
   getJournalEntry,
   trialBalance,
   recordExpense,
+  setEntryCleared,
   ACCOUNT_TYPES,
 } from "@prodigy/db";
 import type { AccountType, JournalLineInput } from "@prodigy/contracts";
@@ -17,6 +18,18 @@ import { requireAuth, requirePermission, userOf } from "./security";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function registerLedgerRoutes(api: Router): void {
+  // Bank reconciliation: mark a cash transaction cleared / un-cleared.
+  api.post(
+    "/journal/:id/cleared",
+    requireAuth,
+    requirePermission("books.manage"),
+    wrap(async (req, res) => {
+      const cleared = (req.body ?? {}) as { cleared?: unknown };
+      await setEntryCleared(userOf(req).tenantId, reqString(req.params.id, "id"), cleared.cleared !== false);
+      res.json({ ok: true });
+    })
+  );
+
   api.get(
     "/accounts",
     requireAuth,

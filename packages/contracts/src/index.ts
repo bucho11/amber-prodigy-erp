@@ -731,6 +731,22 @@ export interface CashFlowStatement {
   /** beginning + netChange === ending AND operating+investing+financing === netChange. */
   reconciled: boolean;
 }
+// ---- Bank reconciliation ----
+export interface CashTransaction {
+  entryId: string;
+  date: string;
+  memo: string | null;
+  amountCents: number; // signed cash movement (>0 = into the bank)
+  cleared: boolean;
+}
+export interface BankReconciliation {
+  asOf: string;
+  bookBalanceCents: number;     // all cash recorded in the ledger through asOf
+  clearedBalanceCents: number;  // cash from transactions marked cleared (should match the bank statement)
+  unclearedCount: number;
+  unclearedCents: number;       // bookBalance − clearedBalance (outstanding items)
+  transactions: CashTransaction[];
+}
 export interface LowStockItem {
   id: string;
   name: string;

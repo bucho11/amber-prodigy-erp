@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~37%** | **~88%** | **BL-032 — Bank reconciliation (manual clearing).** Web-researched the cleared-vs-outstanding model. Added `cleared_at` to journal entries; `bankReconciliation(asOf)` splits cash transactions into cleared vs outstanding (book = cleared + outstanding; cleared should match the bank statement) and `setEntryCleared` toggles clearing (rejects non-cash entries). `GET /reports/bank-reconciliation`, `POST /journal/:id/cleared`, and a Books "Reconcile" subtab (tick transactions, enter statement balance → shows the difference). Test: book ties to the Balance Sheet cash, clearing updates the cleared balance, non-cash entries rejected. 58/58. |
 | 2026-06-07 | **~37%** | **~87%** | **BL-031 — Cash Flow statement (direct method) → the big-3 statements are complete.** Web-researched the method choice (direct is recommended for small/service businesses + exact given our transaction-level GL). `cashFlow(from,to)` categorizes every Cash-touching journal entry by its counterpart (revenue/expense/A-R/A-P/current-liability → Operating; equity → Financing; long-term assets → Investing) so the three sections sum exactly to the change in Cash. `cash_flow_statement` agent tool, `GET /reports/cash-flow`, Reports "Cash flow" section. Test asserts it reconciles (sections = net change = ending − beginning) AND ties to the Balance Sheet's Cash line. 56/56, eval 15 pass^1 100%. **P&L + Balance Sheet + Cash Flow all GL-derived and reconciling.** |
 | 2026-06-07 | **~36%** | **~86%** | **BL-030 — Accounts Receivable: accrual member dues + A/R aging (mirrors A/P).** Made membership dues **accrual**: invoicing posts Dr A/R (1200) / Cr Membership Revenue (4100); paying settles Dr Cash / Cr A/R — so the A/R aging reconciles to the Balance Sheet. New `receivablesAging(asOf)` with the standard buckets (Current / 1–30 / 31–60 / 61–90 / 90+, web-researched), `receivables_aging` agent tool, `GET /reports/receivables-aging`, and a Reports "Accounts receivable" section. 3 new money tests: dues accrue to A/R, aging total = ledger A/R, overdue bucketing, payment settles A/R, books balanced throughout. 55/55, eval 14 pass^1 100%. |
 | 2026-06-07 | **~35%** | **~85%** | **BL-029 — agent A/P write tools (create_bill, pay_bill) through the approval gate.** Brought the new A/P domain into the Agentic-OS: two approval-gated write tools with plain-language impact previews ("Enter a $1500.00 bill from vendor #7 to account 6200 — rent"). Gated test confirms no bill is created without sign-off + exact preview strings; eval `confirm-bill` scenario proves no unapproved write. 52/52, eval 13 pass^1 100%. |
@@ -146,9 +147,9 @@ reality, not priors.
 - **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
   superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
 - **B5 — Back-office depth:** ~~A/R~~ ✅ BL-030 (accrual dues + aging), ~~A/P + vendors~~ ✅ BL-028
-  (bill-pay ACH rails-gated), bank reconciliation, ~~financial statements~~ ✅ **big-3 done** (Balance
-  Sheet BL-026, P&L BL-027, Cash Flow BL-031), period close, cash-basis reporting toggle, payroll
-  **calc** → paystubs → checks → 1099/W-2 prep (ACH + filing rails-gated).
+  (bill-pay ACH rails-gated), ~~bank reconciliation~~ ✅ BL-032 (manual clearing; bank-feed rail later),
+  ~~financial statements~~ ✅ **big-3 done** (Balance Sheet BL-026, P&L BL-027, Cash Flow BL-031), period
+  close, cash-basis reporting toggle, payroll **calc** → paystubs → checks → 1099/W-2 prep (rails-gated).
 - **B6 — Front-of-house polish:** deposits (Stripe-gated), waitlist, classes, website/branded app,
   reviews/reputation, resources.
 - **B7 — AI CORE / Agentic OS** *(the differentiator; epic — starts right after the gate)*:
@@ -171,6 +172,31 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-032 (2026-06-07) — Bank reconciliation (manual clearing) [B5; closes the cash story]
+WHAT: Added `cleared_at TIMESTAMPTZ` to `journal_entries` (self-healing `ALTER … ADD COLUMN IF NOT
+EXISTS`). New `packages/db/src/reconciliation.ts`: `bankReconciliation(tenantId, asOf?)` aggregates every
+cash (1010) transaction into book balance, cleared balance, and outstanding (uncleared) count/total
+(book = cleared + outstanding), returning the transaction list (capped 200) for check-off;
+`setEntryCleared(tenantId, entryId, cleared)` toggles `cleared_at` and rejects non-cash entries. Wired:
+`BankReconciliation`/`CashTransaction` contracts, `GET /reports/bank-reconciliation` (`financials.view`),
+`POST /journal/:id/cleared` (`books.manage`), and a Books "Reconcile" subtab (tick cleared transactions,
+optional bank-statement-balance input that shows the difference vs. the cleared balance). Two money tests:
+book balance ties to the Balance Sheet cash, clearing/un-clearing moves the cleared balance and keeps
+book = cleared + outstanding, and a non-cash (membership-accrual) entry can't be reconciled.
+WHY/HOW: User said continue + always research. Researched the standard model (NetSuite/Bench/Sage):
+cleared = posted by the bank; outstanding = in the ledger but not yet on the statement; the cleared
+balance should match the bank statement and the book−cleared difference is the outstanding items. Modeled
+clearing as a flag on the cash journal entry (the cash transaction), which is the minimal correct
+representation and reconciles by construction. Reused the GL + the `books.manage`/`financials.view` gates.
+BOUNDARY: Manual clearing only — no bank-feed/import rail (B-RAILS), so matching is by eye, not
+auto-matched to statement lines. Clearing is per whole journal entry (each cash transaction is one
+entry, so this is exact for our postings). No saved reconciliation "sessions"/history or locked
+statement periods yet (the toggle is live state); period-close + a saved rec snapshot is the follow-up.
+No separation-of-duties enforcement beyond the existing RBAC. Books/Reports remain outside the
+live-audit covered set (login/dashboard/assistant/public-booking) — extending the audit harness to the
+authed app screens is a tracked follow-up; the new checkbox carries an aria-label.
+GATES: typecheck PASS, build PASS, test 58/58 PASS (audit unchanged — Books not in the covered set).
 
 ### BL-031 (2026-06-07) — Cash Flow statement, direct method [completes the big-3 financial statements]
 WHAT: `cashFlow(tenantId, from, to)` (`reports.ts`) builds a direct-method Cash Flow from the GL. For

@@ -301,4 +301,38 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     const bsCash = bs.assets.find((a) => a.code === "1010")?.balanceCents ?? 0;
     assertEqual(cf.endingCashCents, bsCash, "ending cash ties to the Balance Sheet's Cash line");
   });
+
+  await t.test("bank reconciliation: book = cleared + outstanding; clearing updates the cleared balance", async () => {
+    const rec0 = await db.bankReconciliation(tenantId);
+    const bs = await db.balanceSheet(tenantId, new Date().toISOString().slice(0, 10));
+    const bsCash = bs.assets.find((a) => a.code === "1010")?.balanceCents ?? 0;
+    assertEqual(rec0.bookBalanceCents, bsCash, "book balance ties to the Balance Sheet's cash");
+    assertEqual(rec0.clearedBalanceCents + rec0.unclearedCents, rec0.bookBalanceCents, "cleared + outstanding = book");
+    assert(rec0.transactions.length > 0, "there are cash transactions to reconcile");
+
+    const tx = rec0.transactions[0];
+    await db.setEntryCleared(tenantId, tx.entryId, true);
+    const rec1 = await db.bankReconciliation(tenantId);
+    assertEqual(rec1.clearedBalanceCents, rec0.clearedBalanceCents + tx.amountCents, "cleared balance rose by the cleared transaction");
+    assertEqual(rec1.clearedBalanceCents + rec1.unclearedCents, rec1.bookBalanceCents, "still reconciles after clearing");
+
+    await db.setEntryCleared(tenantId, tx.entryId, false);
+    const rec2 = await db.bankReconciliation(tenantId);
+    assertEqual(rec2.clearedBalanceCents, rec0.clearedBalanceCents, "un-clearing reverts the cleared balance");
+  });
+
+  await t.test("a non-cash journal entry cannot be reconciled", async () => {
+    const nonCash = await db.query<{ id: string }>(
+      `SELECT e.id::text AS id FROM journal_entries e WHERE e.tenant_id = $1 AND e.source_type = 'membership_accrual' LIMIT 1`,
+      [tenantId]
+    );
+    assert(nonCash.length > 0, "a non-cash (membership accrual) entry exists");
+    let threw = false;
+    try {
+      await db.setEntryCleared(tenantId, nonCash[0].id, true);
+    } catch {
+      threw = true;
+    }
+    assert(threw, "clearing a non-cash entry is rejected");
+  });
 }

@@ -512,6 +512,8 @@ async function applySchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_journal_lines_entry ON journal_lines(tenant_id, entry_id);
     CREATE INDEX IF NOT EXISTS idx_journal_lines_account ON journal_lines(tenant_id, account_id);
+    -- Bank reconciliation (BL-032): when a cash transaction cleared the bank (NULL = outstanding).
+    ALTER TABLE journal_entries ADD COLUMN IF NOT EXISTS cleared_at TIMESTAMPTZ;
 
     -- Retail products + inventory (slice 14). Quantities are whole units; money in cents.
     CREATE TABLE IF NOT EXISTS products (
@@ -829,6 +831,7 @@ export * from "./ledger";
 export * from "./inventory";
 export * from "./reports";
 export * from "./payables";
+export * from "./reconciliation";
 export * from "./memberships";
 export * from "./booking";
 export * from "./audit";
