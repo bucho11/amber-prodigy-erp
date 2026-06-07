@@ -77,12 +77,15 @@ export async function createAgentApproval(
 
 export async function listAgentApprovals(
   tenantId: string,
-  opts: { status?: string; limit?: number } = {}
+  opts: { status?: string; decided?: boolean; limit?: number } = {}
 ): Promise<AgentApproval[]> {
   const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
   const rows = await query<ApprovalRow>(
-    `${SELECT} WHERE tenant_id = $1 AND ($2::text IS NULL OR status = $2) ORDER BY id DESC LIMIT $3`,
-    [tenantId, opts.status ?? null, limit]
+    `${SELECT} WHERE tenant_id = $1
+       AND ($2::text IS NULL OR status = $2)
+       AND ($3::boolean IS NOT TRUE OR status <> 'pending')
+     ORDER BY id DESC LIMIT $4`,
+    [tenantId, opts.status ?? null, opts.decided ?? false, limit]
   );
   return rows.map(mapApproval);
 }

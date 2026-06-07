@@ -69,4 +69,12 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     const second = await decideApproval(owner, approval.id, "approve");
     assertEqual(second.status, "already_decided", "second decision is a no-op");
   });
+
+  await t.test("decided-history filter returns only decided actions (excludes pending)", async () => {
+    const stillPending = await requestApproval(owner, "issue_gift_card", { amountCents: 1234, clientId: null, note: null });
+    const decided = await db.listAgentApprovals(tenantId, { decided: true });
+    assert(decided.every((a) => a.status !== "pending"), "history has no pending items");
+    assert(!decided.some((a) => a.id === stillPending.id), "the new pending item is excluded from history");
+    assert(decided.some((a) => a.status === "executed") && decided.some((a) => a.status === "rejected"), "history includes executed + rejected outcomes");
+  });
 }

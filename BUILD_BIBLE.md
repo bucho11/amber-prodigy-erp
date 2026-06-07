@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~26%** | **~71%** | **BL-015 — agent-action history (governance/transparency).** `listAgentApprovals` gained a `decided` filter; new `listRecentDecidedApprovals` + `GET /api/ai/approvals/history`; Assistant now shows a "Recent agent actions" log (Approved & ran / Rejected / Failed) beneath the pending inbox. Owners can audit what the AI proposed and how it was decided. 37/37 green; audit re-run 0 axe violations. |
 | 2026-06-07 | **~26%** | **~70%** | **BL-014 — agent can BOOK appointments (safely).** New `bookAppointmentChecked` db fn (variant lookup → **double-booking guard** [`findConflict`, the same one the calendar uses] → create) + `book_appointment` agent tool (scheduling.manage, approval). The AI-receptionist capability the leaders lead with — but conflict-prevention is enforced (research: the hard requirement) and it's human-approved. 36/36 green (verified: conflict rejected, exactly one appt written). **Metric B crossed 70%.** |
 | 2026-06-07 | **~25%** | **~69%** | **BL-013 — agent gains a clinical WRITE tool (approval-gated).** `add_soap_note` (clinical.manage, approval) lets the agent draft a SOAP note into a client's chart — but it pauses for human sign-off (clinical = high-stakes) and runs under the approver's RBAC through the same `executeTool` path. An AI-charting capability (cf. Jane/Noterro). 35/35 green. `book_appointment` deferred to a dedicated increment because it needs the double-booking guard (research: conflict-prevention is non-negotiable for AI booking). |
 | 2026-06-07 | **~25%** | **~68%** | **BL-012 — broaden the agent registry + FIX a real audit-integrity bug.** Added 5 read tools (find_client, list_appointments, sales_summary, income_summary, inventory_snapshot) so "Ask Prodigy" spans CRM/scheduling/reporting/inventory — all RBAC-gated, calling real db fns. The live gate then caught a latent **security bug**: `verifyAuditChain` sorted by a text alias (`id::text AS id`) → lexicographic order → with ≥10 entries it walked the hash chain out of order and **falsely reported tampering**. Fixed (order by the real bigint column); guarded by a >10-entry intact test + a real-tamper-still-detected test. 34/34 green. |
@@ -142,6 +143,22 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-015 (2026-06-07) — Agent-action history in the Assistant [governance + transparency]
+WHAT: `listAgentApprovals` gained a `decided` filter (status <> 'pending'); new
+`listRecentDecidedApprovals(tenantId)` in `@prodigy/agent`; new `GET /api/ai/approvals/history`; and a
+"Recent agent actions" card in `Assistant.tsx` that lists each decided action with an outcome badge
+(Approved & ran / Rejected / Failed). The pending-inbox refresh now loads pending + history together.
+WHY/HOW: Trust in an agentic system comes from transparency (the copilot-UX research) — owners need to
+see not just what's pending but what the AI has actually done and how each was decided. Reuses the
+existing approval rows (no schema change) — the history IS the decided approvals. Verified: a db test
+confirms the `decided` filter excludes pending + includes executed/rejected; the live-audit harness
+re-ran with the new UI section at 0 axe violations.
+BOUNDARY: History shows the last 25 decided approvals (no pagination/filtering yet) and the proposed
+input, not a rich diff of what changed. Read-only actions (auto-run tools) aren't in this list — they're
+on the tamper-evident audit log (resourceType `agent_tool`); a unified "everything the agent did" view
+(merging auto reads + approved writes) is a later enhancement. No per-action drill-down yet.
+GATES: typecheck PASS, build PASS, test 37/37 PASS, audit 0 axe violations.
 
 ### BL-014 (2026-06-07) — Agent books appointments, double-booking-guarded [the AI-receptionist action]
 WHAT: New `bookAppointmentChecked(tenantId, input)` in `@prodigy/db/scheduling.ts` — resolves the

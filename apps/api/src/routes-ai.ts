@@ -5,6 +5,7 @@ import {
   runAgent,
   requestApproval,
   listPendingApprovals,
+  listRecentDecidedApprovals,
   decideApproval,
   type AgentActor,
 } from "@prodigy/agent";
@@ -73,6 +74,15 @@ export function registerAiRoutes(api: Router): void {
     requireAuth,
     wrap(async (req, res) => {
       res.json({ approvals: await listPendingApprovals(actorOf(req).tenantId) });
+    })
+  );
+
+  // Agent-action history: recently approved/rejected/executed actions.
+  api.get(
+    "/ai/approvals/history",
+    requireAuth,
+    wrap(async (req, res) => {
+      res.json({ approvals: await listRecentDecidedApprovals(actorOf(req).tenantId) });
     })
   );
 

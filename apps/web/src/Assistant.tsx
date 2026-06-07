@@ -46,6 +46,7 @@ export function Assistant() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [approvals, setApprovals] = useState<AgentApproval[] | null>(null);
+  const [history, setHistory] = useState<AgentApproval[] | null>(null);
   const [busyApproval, setBusyApproval] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,12 +56,20 @@ export function Assistant() {
 
   const refreshApprovals = async () => {
     try {
-      const r = await api<{ approvals: AgentApproval[] }>("/ai/approvals");
-      setApprovals(r.approvals);
+      const [pend, hist] = await Promise.all([
+        api<{ approvals: AgentApproval[] }>("/ai/approvals"),
+        api<{ approvals: AgentApproval[] }>("/ai/approvals/history"),
+      ]);
+      setApprovals(pend.approvals);
+      setHistory(hist.approvals);
     } catch {
       setApprovals([]);
+      setHistory([]);
     }
   };
+
+  const historyLabel = (s: string): { text: string; cls: string } =>
+    s === "executed" ? { text: "Approved & ran", cls: "ok" } : s === "rejected" ? { text: "Rejected", cls: "warn" } : { text: "Failed", cls: "bad" };
 
   const send = async () => {
     const message = input.trim();
@@ -210,6 +219,30 @@ export function Assistant() {
                 </div>
               </li>
             ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Recent agent actions</h2>
+        <p className="muted small">A log of what the assistant proposed and how each action was decided.</p>
+        {!history && <p className="muted">Loading&hellip;</p>}
+        {history && history.length === 0 && <p className="muted small">No agent actions yet.</p>}
+        {history && history.length > 0 && (
+          <ul className="approval-list">
+            {history.map((a) => {
+              const lbl = historyLabel(a.status);
+              return (
+                <li key={a.id} className="approval-item">
+                  <div>
+                    <div className="approval-tool">{prettyTool(a.tool)}</div>
+                    <code className="approval-input">{JSON.stringify(a.input)}</code>
+                    <div className="muted small">{new Date(a.createdAt).toLocaleString()}</div>
+                  </div>
+                  <span className={`tag ${lbl.cls === "ok" ? "" : "muted-tag"}`}>{lbl.text}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

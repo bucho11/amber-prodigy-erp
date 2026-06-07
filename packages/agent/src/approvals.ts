@@ -23,6 +23,11 @@ export async function listPendingApprovals(tenantId: string): Promise<AgentAppro
   return listAgentApprovals(tenantId, { status: "pending" });
 }
 
+/** Recently decided approvals (executed / rejected / failed) — the agent-action history. */
+export async function listRecentDecidedApprovals(tenantId: string, limit = 25): Promise<AgentApproval[]> {
+  return listAgentApprovals(tenantId, { decided: true, limit });
+}
+
 export type ApprovalOutcome =
   | { status: "executed"; approval: AgentApproval; execution: ToolExecution }
   | { status: "failed"; approval: AgentApproval; execution: ToolExecution }
