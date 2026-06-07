@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~25%** | **~69%** | **BL-013 — agent gains a clinical WRITE tool (approval-gated).** `add_soap_note` (clinical.manage, approval) lets the agent draft a SOAP note into a client's chart — but it pauses for human sign-off (clinical = high-stakes) and runs under the approver's RBAC through the same `executeTool` path. An AI-charting capability (cf. Jane/Noterro). 35/35 green. `book_appointment` deferred to a dedicated increment because it needs the double-booking guard (research: conflict-prevention is non-negotiable for AI booking). |
 | 2026-06-07 | **~25%** | **~68%** | **BL-012 — broaden the agent registry + FIX a real audit-integrity bug.** Added 5 read tools (find_client, list_appointments, sales_summary, income_summary, inventory_snapshot) so "Ask Prodigy" spans CRM/scheduling/reporting/inventory — all RBAC-gated, calling real db fns. The live gate then caught a latent **security bug**: `verifyAuditChain` sorted by a text alias (`id::text AS id`) → lexicographic order → with ≥10 entries it walked the hash chain out of order and **falsely reported tampering**. Fixed (order by the real bigint column); guarded by a >10-entry intact test + a real-tamper-still-detected test. 34/34 green. |
 | 2026-06-07 | **~24%** | **~67%** | **BL-011 — design-system polish: elevation, focus rings, button states.** Added `:root` design tokens (`--radius`, `--shadow`/`--shadow-sm`, `--ring`); soft card elevation, primary-button shadow + hover lift, input focus rings, font smoothing, and **keyboard `:focus-visible` rings on every interactive element** (P12). Global (no component JSX touched) → lifts every screen. Audit re-run: still **0 axe violations**; visually reviewed. Next: per-screen polish + feature depth. |
 | 2026-06-07 | **~24%** | **~66%** | **BL-010 — UI overhaul #1: sidebar navigation + layout shell.** Replaced the centered topnav (12 tabs overflowing/wrapping) with a modern grouped **left sidebar** (Front desk / Back office / Setup) + a wider content area — the standard premium-SaaS shell (Boulevard/Mangomint aesthetic). Preserved the `<main>` landmark + single `<h1>`; `aria-current` on the active item; responsive collapse. Audit re-run: **still 0 axe violations**, topnav-overflow finding resolved. Visually reviewed. Next: design-token/typography refinement + per-screen polish, then clinical/back-office depth. |
@@ -140,6 +141,23 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-013 (2026-06-07) — Agent clinical write tool: add_soap_note (approval-gated) [the agent can now act, not just read]
+WHAT: Added `add_soap_note` to the registry — permission `clinical.manage`, risk `approval`. Drafts a
+SOAP note (S/O/A/P + date) into a client's chart via the real `createSoapNote` db fn. Required-date
+validator (`reqDate`). Tests: pauses without approval (no write), denied for a role lacking
+clinical.manage, and on approval writes exactly one note carrying the right content (35/35).
+WHY/HOW: First agent WRITE beyond gift cards — an AI-charting capability the clinical leaders (Jane,
+Noterro) lead with. Clinical data is high-stakes, so it's approval-gated (never auto-runs) and executes
+under the approver's authority through the same `executeTool` choke point (validated → real db → audited).
+Researched AI-booking guardrails first and deliberately deferred `book_appointment`: raw
+`createAppointment` has no conflict guard, and the research is unanimous that double-booking prevention
+is the hard requirement — so that tool needs `findConflict` wired in, as its own careful increment.
+BOUNDARY: `add_soap_note` doesn't validate the date is sane vs. the client's history or attach an
+appointment/provider (nulls for now) — a fuller clinical-charting tool (link appointment, body chart,
+templates) is later. `book_appointment` and other write tools (refunds, inventory adjust) are not yet
+exposed. Clinical note content is whatever the model proposes — the human approves before it's saved.
+GATES: typecheck PASS, build PASS, test 35/35 PASS.
 
 ### BL-012 (2026-06-07) — Broaden agent tools + fix a latent audit-integrity bug [more capability, hardened security]
 WHAT: Added 5 read tools to `@prodigy/agent` registry — `find_client` (clients.view), `list_appointments`

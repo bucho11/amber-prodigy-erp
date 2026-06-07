@@ -97,6 +97,24 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assertEqual(out.status, "error", "non-ISO date rejected");
   });
 
+  await t.test("clinical write tool: approval-gated, RBAC-gated, writes a real SOAP note", async () => {
+    const c = await db.createClient(tenantId, { displayName: "SOAP Subject" });
+    // No approval → pauses, no note written.
+    const pending = await executeTool(owner, "add_soap_note", { clientId: c.id, date: "2026-06-07", subjective: "client reports tension" });
+    assertEqual(pending.status, "requires_approval", "unapproved clinical write pauses");
+
+    // RBAC: front desk lacks clinical.manage.
+    const denied = await executeTool(frontDesk, "add_soap_note", { clientId: c.id, date: "2026-06-07" }, { approved: true });
+    assertEqual(denied.status, "denied", "front desk denied clinical write");
+
+    // Approved by an authorized actor → writes the note.
+    const ok = await executeTool(owner, "add_soap_note", { clientId: c.id, date: "2026-06-07", assessment: "improving" }, { approved: true });
+    assertEqual(ok.status, "ok", "approved clinical write executes");
+    assert(ok.status === "ok" && (ok.result as { assessment: string | null }).assessment === "improving", "the note carries the assessment");
+    const notes = await db.listSoapNotes(tenantId, c.id);
+    assertEqual(notes.length, 1, "exactly one SOAP note persisted to the chart (the pending one never wrote)");
+  });
+
   await t.test("every agent action landed on the tamper-evident audit chain (intact)", async () => {
     const chain = await db.verifyAuditChain(tenantId);
     assert(chain.intact, "audit chain intact after agent activity");

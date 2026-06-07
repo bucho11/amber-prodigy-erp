@@ -10,6 +10,7 @@ import {
   salesSummary,
   incomeSummary,
   inventorySnapshot,
+  createSoapNote,
   type ClientInput,
 } from "@prodigy/db";
 import type { AgentActor, AgentTool, ToolDefinition } from "./types";
@@ -34,6 +35,10 @@ const isoDay = (d: Date): string => d.toISOString().slice(0, 10);
 function optDate(v: unknown, fallback: string): string {
   if (v === undefined || v === null || v === "") return fallback;
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new ToolInputError("Dates must be YYYY-MM-DD.");
+  return v;
+}
+function reqDate(v: unknown, field: string): string {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new ToolInputError(`'${field}' must be a date (YYYY-MM-DD).`);
   return v;
 }
 function monthStart(): string {
@@ -190,6 +195,50 @@ const TOOLS: AgentTool[] = [
       return { displayName: reqStr(i.displayName, "displayName"), email: optStr(i.email), phone: optStr(i.phone) };
     },
     handler: ({ actor }, input) => createClient(actor.tenantId, input as ClientInput),
+  },
+  {
+    name: "add_soap_note",
+    description:
+      "Add a SOAP clinical note (Subjective / Objective / Assessment / Plan) to a client's chart. This WRITES clinical records, so it requires human approval before it runs. Needs a clientId and a date (YYYY-MM-DD); the S/O/A/P fields are optional text.",
+    permission: "clinical.manage",
+    risk: "approval",
+    inputSchema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        subjective: { type: "string" },
+        objective: { type: "string" },
+        assessment: { type: "string" },
+        plan: { type: "string" },
+      },
+      required: ["clientId", "date"],
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return {
+        clientId: reqStr(i.clientId, "clientId"),
+        date: reqDate(i.date, "date"),
+        appointmentId: null,
+        providerId: null,
+        subjective: optStr(i.subjective),
+        objective: optStr(i.objective),
+        assessment: optStr(i.assessment),
+        plan: optStr(i.plan),
+      };
+    },
+    handler: ({ actor }, input) =>
+      createSoapNote(actor.tenantId, input as {
+        clientId: string;
+        date: string;
+        appointmentId: string | null;
+        providerId: string | null;
+        subjective: string | null;
+        objective: string | null;
+        assessment: string | null;
+        plan: string | null;
+      }),
   },
   {
     name: "issue_gift_card",
