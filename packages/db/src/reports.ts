@@ -1,5 +1,5 @@
 import { query } from "./index";
-import type { IncomeLine, IncomeSummary, InventorySnapshot, LowStockItem, PaymentMethodTotal, SalesSummary } from "@prodigy/contracts";
+import type { BalanceSheet, BalanceSheetLine, IncomeLine, IncomeSummary, InventorySnapshot, LowStockItem, PaymentMethodTotal, SalesSummary } from "@prodigy/contracts";
 
 const n = (v: unknown): number => Number(v ?? 0);
 
@@ -79,6 +79,70 @@ export async function incomeSummary(tenantId: string, from: string, to: string):
     }
   }
   return { from, to, revenueCents, expenseCents, netIncomeCents: revenueCents - expenseCents, revenue, expenses };
+}
+
+/**
+ * Balance Sheet as of `asOf` (inclusive), straight from the general ledger — the other half of the
+ * core financial statements (the "real books / replace QuickBooks" thesis). Asset/liability/equity
+ * balances are cumulative through `asOf`; because there is no period-close yet, revenue and expense
+ * accounts never roll into equity, so net-income-to-date is computed and folded into equity as a
+ * synthetic line. That makes the double-entry invariant hold: Assets = Liabilities + Equity.
+ */
+export async function balanceSheet(tenantId: string, asOf: string): Promise<BalanceSheet> {
+  const rows = await query<{ type: string; code: string; name: string; d: string; c: string }>(
+    `SELECT a.type, a.code, a.name,
+            COALESCE(SUM(l.debit_cents), 0)::bigint AS d,
+            COALESCE(SUM(l.credit_cents), 0)::bigint AS c
+     FROM accounts a
+     LEFT JOIN journal_lines l ON l.account_id = a.id AND l.tenant_id = a.tenant_id
+     LEFT JOIN journal_entries e ON e.id = l.entry_id AND e.entry_date <= $2
+     WHERE a.tenant_id = $1
+     GROUP BY a.type, a.code, a.name
+     ORDER BY a.code`,
+    [tenantId, asOf]
+  );
+
+  const assets: BalanceSheetLine[] = [];
+  const liabilities: BalanceSheetLine[] = [];
+  const equity: BalanceSheetLine[] = [];
+  let totalAssets = 0, totalLiabilities = 0, equityAccounts = 0, netIncome = 0;
+
+  for (const r of rows) {
+    const debitBal = n(r.d) - n(r.c); // >0 = net debit
+    if (r.type === "asset") {
+      if (debitBal !== 0) assets.push({ code: r.code, name: r.name, balanceCents: debitBal });
+      totalAssets += debitBal;
+    } else if (r.type === "liability") {
+      const bal = -debitBal; // liabilities carry a credit balance
+      if (bal !== 0) liabilities.push({ code: r.code, name: r.name, balanceCents: bal });
+      totalLiabilities += bal;
+    } else if (r.type === "equity") {
+      const bal = -debitBal; // equity carries a credit balance
+      if (bal !== 0) equity.push({ code: r.code, name: r.name, balanceCents: bal });
+      equityAccounts += bal;
+    } else if (r.type === "revenue") {
+      netIncome += -debitBal; // revenue is a credit balance
+    } else if (r.type === "expense") {
+      netIncome -= debitBal; // expense is a debit balance
+    }
+  }
+
+  // Fold net income to date into equity (no closing entry exists yet) so the sheet balances.
+  if (netIncome !== 0) equity.push({ code: "3999", name: "Net income (undistributed)", balanceCents: netIncome });
+  const totalEquity = equityAccounts + netIncome;
+  const outOfBalance = totalAssets - (totalLiabilities + totalEquity);
+  return {
+    asOf,
+    assets,
+    liabilities,
+    equity,
+    totalAssetsCents: totalAssets,
+    totalLiabilitiesCents: totalLiabilities,
+    netIncomeToDateCents: netIncome,
+    totalEquityCents: totalEquity,
+    outOfBalanceCents: outOfBalance,
+    balanced: outOfBalance === 0,
+  };
 }
 
 /** Current stock position (not date-ranged). */

@@ -9,6 +9,7 @@ import {
   listAppointments,
   salesSummary,
   incomeSummary,
+  balanceSheet,
   inventorySnapshot,
   createSoapNote,
   bookAppointmentChecked,
@@ -203,6 +204,24 @@ const TOOLS: AgentTool[] = [
       return { from: optDate(i.from, monthStart()), to: optDate(i.to, today()) };
     },
     handler: ({ actor }, input) => incomeSummary(actor.tenantId, (input as { from: string }).from, (input as { to: string }).to),
+  },
+  {
+    name: "get_balance_sheet",
+    description:
+      "Balance sheet from the ledger as of a date (defaults to today): assets, liabilities, and equity (with net income to date folded in). Call this for questions about what the business owns/owes, financial position, or net worth. Date is YYYY-MM-DD.",
+    permission: "reports.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { asOf: { type: "string" } },
+      additionalProperties: false,
+    },
+    parse: (input) => ({ asOf: optDate((input as Record<string, unknown> | undefined)?.asOf, today()) }),
+    handler: ({ actor }, input) => balanceSheet(actor.tenantId, (input as { asOf: string }).asOf),
+    summarize: (r) => {
+      const b = r as { totalAssetsCents: number; totalLiabilitiesCents: number; totalEquityCents: number; balanced: boolean };
+      return `Balance sheet: assets ${usd(b.totalAssetsCents)} = liabilities ${usd(b.totalLiabilitiesCents)} + equity ${usd(b.totalEquityCents)}${b.balanced ? " (balanced)" : " (OUT OF BALANCE — investigate)"}.`;
+    },
   },
   {
     name: "inventory_snapshot",

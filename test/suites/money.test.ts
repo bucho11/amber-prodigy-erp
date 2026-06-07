@@ -223,4 +223,21 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
       "the other tenant sees its own order"
     );
   });
+
+  await t.test("balance sheet foots: Assets = Liabilities + Equity, with net income folded in", async () => {
+    // After all the sales/refunds/gift-cards/packages above, the financial statement must balance.
+    const asOf = new Date().toISOString().slice(0, 10);
+    const bs = await db.balanceSheet(tenantId, asOf);
+    assertEqual(
+      bs.totalAssetsCents,
+      bs.totalLiabilitiesCents + bs.totalEquityCents,
+      "Assets equal Liabilities + Equity (the double-entry invariant)"
+    );
+    assertEqual(bs.outOfBalanceCents, 0, "out-of-balance is exactly zero");
+    assert(bs.balanced, "balanced flag is true");
+    // Net income to date on the sheet must equal the all-time income statement's net income.
+    const inc = await db.incomeSummary(tenantId, "2000-01-01", asOf);
+    assertEqual(bs.netIncomeToDateCents, inc.netIncomeCents, "equity's net income matches the P&L");
+    assert(bs.totalAssetsCents > 0, "the sheet has real activity (assets posted from sales)");
+  });
 }

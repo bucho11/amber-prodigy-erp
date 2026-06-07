@@ -634,6 +634,26 @@ export interface IncomeSummary {
   revenue: IncomeLine[];
   expenses: IncomeLine[];
 }
+export interface BalanceSheetLine {
+  code: string;
+  name: string;
+  /** Account balance as of the statement date, signed per the account's normal side (>0 = normal). */
+  balanceCents: number;
+}
+export interface BalanceSheet {
+  asOf: string;
+  assets: BalanceSheetLine[];
+  liabilities: BalanceSheetLine[];
+  equity: BalanceSheetLine[]; // includes a synthetic "Net income (undistributed)" line
+  totalAssetsCents: number;
+  totalLiabilitiesCents: number;
+  /** Net income to date (revenue − expenses through asOf); folded into equity (no period-close yet). */
+  netIncomeToDateCents: number;
+  totalEquityCents: number; // equity accounts + netIncomeToDate
+  /** Assets − (Liabilities + Equity). 0 when the books balance (the double-entry invariant). */
+  outOfBalanceCents: number;
+  balanced: boolean;
+}
 export interface LowStockItem {
   id: string;
   name: string;

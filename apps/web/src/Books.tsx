@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { useAuth } from "./auth";
-import type { Account, AccountType, JournalEntry, JournalEntryListItem, TrialBalance } from "@prodigy/contracts";
+import type { Account, AccountType, BalanceSheet, JournalEntry, JournalEntryListItem, TrialBalance } from "@prodigy/contracts";
 
 const fmt = (cents: number): string => {
   const v = (Math.abs(cents) / 100).toFixed(2);
@@ -20,7 +20,7 @@ const SOURCE_LABEL: Record<string, string> = {
 export function BooksPage() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission("books.manage");
-  const [tab, setTab] = useState<"trial" | "journal" | "expense" | "accounts">("trial");
+  const [tab, setTab] = useState<"trial" | "balance" | "journal" | "expense" | "accounts">("trial");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const loadAccounts = () => api<{ accounts: Account[] }>("/accounts").then((r) => setAccounts(r.accounts)).catch(() => {});
   useEffect(() => {
@@ -32,6 +32,9 @@ export function BooksPage() {
       <div className="subtabs">
         <button className={tab === "trial" ? "subtab active" : "subtab"} onClick={() => setTab("trial")}>
           Trial balance
+        </button>
+        <button className={tab === "balance" ? "subtab active" : "subtab"} onClick={() => setTab("balance")}>
+          Balance sheet
         </button>
         <button className={tab === "journal" ? "subtab active" : "subtab"} onClick={() => setTab("journal")}>
           Journal
@@ -46,6 +49,7 @@ export function BooksPage() {
         </button>
       </div>
       {tab === "trial" && <TrialBalanceView />}
+      {tab === "balance" && <BalanceSheetView />}
       {tab === "journal" && <JournalView accounts={accounts} canWrite={canWrite} />}
       {tab === "expense" && canWrite && <ExpensesView accounts={accounts} />}
       {tab === "accounts" && <AccountsView accounts={accounts} canWrite={canWrite} onChange={loadAccounts} />}
@@ -94,6 +98,79 @@ function TrialBalanceView() {
               <td>Total</td>
               <td className="num">{fmt(tb.totalDebitCents)}</td>
               <td className="num">{fmt(tb.totalCreditCents)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function BalanceSheetView() {
+  const [asOf, setAsOf] = useState(todayStr());
+  const [bs, setBs] = useState<BalanceSheet | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    setBs(null);
+    api<{ balanceSheet: BalanceSheet }>(`/reports/balance-sheet?asOf=${asOf}`)
+      .then((r) => setBs(r.balanceSheet))
+      .catch((e) => setError((e as Error).message));
+  }, [asOf]);
+
+  const sectionRows = (lines: BalanceSheet["assets"]) =>
+    lines.length === 0 ? (
+      <tr>
+        <td className="muted small">None</td>
+        <td className="num"></td>
+      </tr>
+    ) : (
+      lines.map((l) => (
+        <tr key={l.code}>
+          <td>
+            <span className="muted small">{l.code}</span> {l.name}
+          </td>
+          <td className="num">{fmt(l.balanceCents)}</td>
+        </tr>
+      ))
+    );
+
+  return (
+    <section className="card">
+      <div className="ticket-head">
+        <h2>Balance sheet</h2>
+        <label className="field" style={{ maxWidth: 170 }}>
+          <span className="muted small">As of</span>
+          <input className="input" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+        </label>
+      </div>
+      <p className="muted small">What the business owns and owes, straight from the ledger. Assets always equal liabilities plus equity.</p>
+      {error && <p className="bad small">{error}</p>}
+      {!bs && !error && <p className="muted">Loading&hellip;</p>}
+      {bs && (
+        <table className="data-table">
+          <tbody>
+            <tr className="total-row"><td>Assets</td><td className="num"></td></tr>
+            {sectionRows(bs.assets)}
+            <tr className="total-row"><td>Total assets</td><td className="num">{fmt(bs.totalAssetsCents)}</td></tr>
+
+            <tr className="total-row"><td>Liabilities</td><td className="num"></td></tr>
+            {sectionRows(bs.liabilities)}
+            <tr className="total-row"><td>Total liabilities</td><td className="num">{fmt(bs.totalLiabilitiesCents)}</td></tr>
+
+            <tr className="total-row"><td>Equity</td><td className="num"></td></tr>
+            {sectionRows(bs.equity)}
+            <tr className="total-row"><td>Total equity</td><td className="num">{fmt(bs.totalEquityCents)}</td></tr>
+          </tbody>
+          <tfoot>
+            <tr className="total-row">
+              <td>Liabilities + equity</td>
+              <td className="num">{fmt(bs.totalLiabilitiesCents + bs.totalEquityCents)}</td>
+            </tr>
+            <tr className={bs.balanced ? "" : "total-row"}>
+              <td className={bs.balanced ? "muted small" : "bad"}>
+                {bs.balanced ? "✓ In balance" : "Out of balance"}
+              </td>
+              <td className="num">{bs.balanced ? "" : fmt(bs.outOfBalanceCents)}</td>
             </tr>
           </tfoot>
         </table>

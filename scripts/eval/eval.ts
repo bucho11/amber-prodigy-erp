@@ -38,6 +38,7 @@ interface Scenario {
 const SCENARIOS: Scenario[] = [
   // ---- TOOL_SELECTION (runnable against the simulated heuristic) ----
   { id: "sel-trial-balance", category: "TOOL_SELECTION", prompt: "What's the current trial balance?", expectTools: ["get_trial_balance"] },
+  { id: "sel-balance-sheet", category: "TOOL_SELECTION", prompt: "What's our balance sheet — what do we own and owe?", expectTools: ["get_balance_sheet"] },
   { id: "sel-sales", category: "TOOL_SELECTION", prompt: "Give me a sales summary for this month.", expectTools: ["sales_summary"] },
   { id: "sel-inventory", category: "TOOL_SELECTION", prompt: "What's our inventory snapshot?", expectTools: ["inventory_snapshot"] },
   { id: "sel-find-client", category: "TOOL_SELECTION", prompt: "Find the client named Jordan.", expectTools: ["find_client"] },

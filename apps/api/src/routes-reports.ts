@@ -1,5 +1,5 @@
 import type { Router } from "express";
-import { salesSummary, incomeSummary, inventorySnapshot } from "@prodigy/db";
+import { salesSummary, incomeSummary, balanceSheet, inventorySnapshot } from "@prodigy/db";
 import { ValidationError, optString, wrap } from "./http";
 import { requireAuth, requirePermission, userOf } from "./security";
 
@@ -32,6 +32,17 @@ export function registerReportRoutes(api: Router): void {
     wrap(async (req, res) => {
       const { from, to } = range(req);
       res.json({ incomeSummary: await incomeSummary(userOf(req).tenantId, from, to) });
+    })
+  );
+
+  api.get(
+    "/reports/balance-sheet",
+    requireAuth,
+    requirePermission("reports.view"),
+    wrap(async (req, res) => {
+      const asOf = optString(req.query.asOf) ?? new Date().toISOString().slice(0, 10);
+      if (!DATE_RE.test(asOf)) throw new ValidationError("asOf must be YYYY-MM-DD.");
+      res.json({ balanceSheet: await balanceSheet(userOf(req).tenantId, asOf) });
     })
   );
 
