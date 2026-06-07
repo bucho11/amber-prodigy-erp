@@ -11,6 +11,7 @@ import {
   incomeSummary,
   inventorySnapshot,
   createSoapNote,
+  bookAppointmentChecked,
   type ClientInput,
 } from "@prodigy/db";
 import type { AgentActor, AgentTool, ToolDefinition } from "./types";
@@ -195,6 +196,46 @@ const TOOLS: AgentTool[] = [
       return { displayName: reqStr(i.displayName, "displayName"), email: optStr(i.email), phone: optStr(i.phone) };
     },
     handler: ({ actor }, input) => createClient(actor.tenantId, input as ClientInput),
+  },
+  {
+    name: "book_appointment",
+    description:
+      "Book an appointment for a client with a provider at a specific time. This WRITES to the calendar and is double-booking-guarded, so it requires human approval before it runs. Needs clientId, providerId, serviceVariantId, and startsAt (ISO 8601, e.g. 2026-09-01T17:00:00Z). Optional roomId and notes.",
+    permission: "scheduling.manage",
+    risk: "approval",
+    inputSchema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string" },
+        providerId: { type: "string" },
+        serviceVariantId: { type: "string" },
+        startsAt: { type: "string", description: "ISO 8601 start time" },
+        roomId: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["clientId", "providerId", "serviceVariantId", "startsAt"],
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return {
+        clientId: reqStr(i.clientId, "clientId"),
+        providerId: reqStr(i.providerId, "providerId"),
+        serviceVariantId: reqStr(i.serviceVariantId, "serviceVariantId"),
+        startsAt: reqStr(i.startsAt, "startsAt"),
+        roomId: optStr(i.roomId),
+        notes: optStr(i.notes),
+      };
+    },
+    handler: ({ actor }, input) =>
+      bookAppointmentChecked(actor.tenantId, input as {
+        clientId: string;
+        providerId: string;
+        serviceVariantId: string;
+        startsAt: string;
+        roomId: string | null;
+        notes: string | null;
+      }),
   },
   {
     name: "add_soap_note",

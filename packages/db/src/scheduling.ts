@@ -224,6 +224,52 @@ export async function createAppointment(tenantId: string, input: CreateAppointme
   return appt;
 }
 
+export class SchedulingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SchedulingError";
+  }
+}
+
+export interface BookCheckedInput {
+  clientId: string;
+  providerId: string;
+  roomId: string | null;
+  serviceVariantId: string;
+  startsAt: string;
+  notes: string | null;
+}
+
+/**
+ * Book an appointment SAFELY: resolve the service variant (for duration + price), apply the same
+ * hard double-booking guard the internal calendar uses (provider + room overlap), then create.
+ * Throws SchedulingError on a bad reference, invalid time, or conflict. One safe entry point so the
+ * agent books through the exact same guard humans do (P7) — never a raw, unchecked insert.
+ */
+export async function bookAppointmentChecked(tenantId: string, input: BookCheckedInput): Promise<Appointment> {
+  const variant = await getVariantForBooking(tenantId, input.serviceVariantId);
+  if (!variant) throw new SchedulingError("That service variant isn't available.");
+  const start = new Date(input.startsAt);
+  if (isNaN(start.getTime())) throw new SchedulingError("That start time is invalid.");
+  const startsAt = start.toISOString();
+  const endsAt = new Date(start.getTime() + variant.durationMinutes * 60000).toISOString();
+
+  const conflict = await findConflict(tenantId, { providerId: input.providerId, roomId: input.roomId, startsAt, endsAt });
+  if (conflict) throw new SchedulingError(`That time conflicts with an existing ${conflict.kind} booking.`);
+
+  return createAppointment(tenantId, {
+    clientId: input.clientId,
+    providerId: input.providerId,
+    roomId: input.roomId,
+    serviceVariantId: variant.id,
+    startsAt,
+    endsAt,
+    priceCents: variant.priceCents,
+    notes: input.notes,
+    protocolInstanceId: null,
+  });
+}
+
 const APPT_UPDATE_COLUMNS: Record<string, string> = {
   clientId: "client_id",
   providerId: "provider_id",

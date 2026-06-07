@@ -97,6 +97,31 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assertEqual(out.status, "error", "non-ISO date rejected");
   });
 
+  await t.test("booking tool: approval-gated, RBAC-gated, double-booking-guarded", async () => {
+    const provider = (await db.query<{ id: string }>(`SELECT id::text AS id FROM staff_profiles WHERE tenant_id = $1 AND is_active LIMIT 1`, [tenantId]))[0];
+    const variant = (await db.query<{ id: string }>(`SELECT id::text AS id FROM service_variants WHERE tenant_id = $1 ORDER BY id LIMIT 1`, [tenantId]))[0];
+    assert(provider && variant, "seeded provider + variant exist");
+    const c = await db.createClient(tenantId, { displayName: "Booking Subject" });
+    const at = "2026-09-01T17:00:00.000Z";
+    const args = { clientId: c.id, providerId: provider.id, serviceVariantId: variant.id, startsAt: at };
+
+    const pending = await executeTool(owner, "book_appointment", args);
+    assertEqual(pending.status, "requires_approval", "unapproved booking pauses");
+
+    assertEqual((await executeTool(frontDesk, "book_appointment", args, { approved: true })).status, "denied", "front desk denied (no scheduling.manage)");
+
+    const ok = await executeTool(owner, "book_appointment", args, { approved: true });
+    assertEqual(ok.status, "ok", "approved booking executes");
+
+    // Booking the same provider at the same time again must be blocked by the double-booking guard.
+    const conflict = await executeTool(owner, "book_appointment", args, { approved: true });
+    assertEqual(conflict.status, "error", "double-booking is rejected");
+    assert(conflict.status === "error" && /conflict/i.test(conflict.reason), "error explains the conflict");
+
+    const appts = await db.listAppointments(tenantId, { clientId: c.id });
+    assertEqual(appts.length, 1, "exactly one appointment was booked (the conflict + pending never wrote)");
+  });
+
   await t.test("clinical write tool: approval-gated, RBAC-gated, writes a real SOAP note", async () => {
     const c = await db.createClient(tenantId, { displayName: "SOAP Subject" });
     // No approval → pauses, no note written.

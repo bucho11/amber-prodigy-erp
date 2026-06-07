@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~26%** | **~70%** | **BL-014 — agent can BOOK appointments (safely).** New `bookAppointmentChecked` db fn (variant lookup → **double-booking guard** [`findConflict`, the same one the calendar uses] → create) + `book_appointment` agent tool (scheduling.manage, approval). The AI-receptionist capability the leaders lead with — but conflict-prevention is enforced (research: the hard requirement) and it's human-approved. 36/36 green (verified: conflict rejected, exactly one appt written). **Metric B crossed 70%.** |
 | 2026-06-07 | **~25%** | **~69%** | **BL-013 — agent gains a clinical WRITE tool (approval-gated).** `add_soap_note` (clinical.manage, approval) lets the agent draft a SOAP note into a client's chart — but it pauses for human sign-off (clinical = high-stakes) and runs under the approver's RBAC through the same `executeTool` path. An AI-charting capability (cf. Jane/Noterro). 35/35 green. `book_appointment` deferred to a dedicated increment because it needs the double-booking guard (research: conflict-prevention is non-negotiable for AI booking). |
 | 2026-06-07 | **~25%** | **~68%** | **BL-012 — broaden the agent registry + FIX a real audit-integrity bug.** Added 5 read tools (find_client, list_appointments, sales_summary, income_summary, inventory_snapshot) so "Ask Prodigy" spans CRM/scheduling/reporting/inventory — all RBAC-gated, calling real db fns. The live gate then caught a latent **security bug**: `verifyAuditChain` sorted by a text alias (`id::text AS id`) → lexicographic order → with ≥10 entries it walked the hash chain out of order and **falsely reported tampering**. Fixed (order by the real bigint column); guarded by a >10-entry intact test + a real-tamper-still-detected test. 34/34 green. |
 | 2026-06-07 | **~24%** | **~67%** | **BL-011 — design-system polish: elevation, focus rings, button states.** Added `:root` design tokens (`--radius`, `--shadow`/`--shadow-sm`, `--ring`); soft card elevation, primary-button shadow + hover lift, input focus rings, font smoothing, and **keyboard `:focus-visible` rings on every interactive element** (P12). Global (no component JSX touched) → lifts every screen. Audit re-run: still **0 axe violations**; visually reviewed. Next: per-screen polish + feature depth. |
@@ -141,6 +142,28 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-014 (2026-06-07) — Agent books appointments, double-booking-guarded [the AI-receptionist action]
+WHAT: New `bookAppointmentChecked(tenantId, input)` in `@prodigy/db/scheduling.ts` — resolves the
+service variant (duration + price), applies the same hard double-booking guard the internal calendar
+uses (`findConflict` on provider + room overlap), then creates; throws a typed `SchedulingError` on a
+bad reference, invalid time, or conflict. New `book_appointment` agent tool (scheduling.manage,
+approval) calls it. Tests: pauses without approval, RBAC-denied without scheduling.manage, approved
+booking succeeds, and a second booking at the same provider+time is rejected as a conflict — with
+exactly one appointment persisted (36/36).
+WHY/HOW: This is the headline AI-receptionist capability (cf. Zenoti's AI Workforce). The research was
+unanimous that **double-booking prevention is the hard requirement**, so I did NOT expose raw
+`createAppointment`; instead a single safe entry point wraps it with the conflict guard (P7 — humans
+and the agent book through the same guard) and it's approval-gated (writes to the calendar). The agent
+provides clientId/providerId/serviceVariantId/startsAt; duration/price/endsAt are derived server-side so
+the model can't fabricate them.
+BOUNDARY: `bookAppointmentChecked` enforces the hard double-booking guard but not working-hours
+availability (advisory, consistent with the existing internal calendar — only the overlap guard is hard).
+`SchedulingError` isn't mapped in the HTTP error handler yet (no HTTP route uses the fn — the agent tool
+catches it via `executeTool`); wire that mapping when an internal booking route adopts it. The agent
+must already know the provider/variant ids (it can get them via `list_appointments`/catalog tools or the
+human supplies them) — a friendlier "book by name/time" resolver is a later enhancement.
+GATES: typecheck PASS, build PASS, test 36/36 PASS.
 
 ### BL-013 (2026-06-07) — Agent clinical write tool: add_soap_note (approval-gated) [the agent can now act, not just read]
 WHAT: Added `add_soap_note` to the registry — permission `clinical.manage`, risk `approval`. Drafts a
