@@ -289,4 +289,16 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assertEqual(before - after, 7000, "A/R fell by the paid dues amount");
     await assertBalanced(db, tenantId, "after dues payment");
   });
+
+  await t.test("cash flow statement reconciles to the change in cash and ties to the Balance Sheet", async () => {
+    const to = new Date().toISOString().slice(0, 10);
+    const cf = await db.cashFlow(tenantId, "2000-01-01", to);
+    assertEqual(cf.operatingCents + cf.investingCents + cf.financingCents, cf.netChangeCents, "operating + investing + financing = net change");
+    assertEqual(cf.netChangeCents, cf.endingCashCents - cf.beginningCashCents, "net change = ending − beginning cash");
+    assert(cf.reconciled, "cash flow is internally reconciled");
+    assert(cf.operatingCents !== 0, "operating cash flow recorded (cash sales happened)");
+    const bs = await db.balanceSheet(tenantId, to);
+    const bsCash = bs.assets.find((a) => a.code === "1010")?.balanceCents ?? 0;
+    assertEqual(cf.endingCashCents, bsCash, "ending cash ties to the Balance Sheet's Cash line");
+  });
 }

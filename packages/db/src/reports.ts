@@ -1,5 +1,5 @@
 import { query } from "./index";
-import type { AgingBucket, BalanceSheet, BalanceSheetLine, IncomeLine, IncomeSummary, InventorySnapshot, LowStockItem, PaymentMethodTotal, ReceivableItem, ReceivablesAging, SalesSummary } from "@prodigy/contracts";
+import type { AgingBucket, BalanceSheet, BalanceSheetLine, CashFlowLine, CashFlowStatement, IncomeLine, IncomeSummary, InventorySnapshot, LowStockItem, PaymentMethodTotal, ReceivableItem, ReceivablesAging, SalesSummary } from "@prodigy/contracts";
 
 const n = (v: unknown): number => Number(v ?? 0);
 
@@ -195,6 +195,80 @@ export async function receivablesAging(tenantId: string, asOf: string): Promise<
     items.push({ invoiceId: r.invoice_id, clientName: r.client_name, amountCents: amt, dueDate: r.due_date, daysPastDue: Math.max(0, d) });
   }
   return { asOf, buckets, items, totalCents, totalCount: rows.length };
+}
+
+/**
+ * Direct-method Cash Flow statement over [from, to] from the ledger (the method recommended for
+ * small/service businesses, and exact given transaction-level data). For every journal entry that
+ * touches Cash (1010), each non-cash counterpart line contributes (credit − debit) to cash flow,
+ * categorized by the counterpart account: revenue/expense/current-asset(A-R,inventory)/liability →
+ * Operating; equity → Financing; other (long-term) assets → Investing. By double-entry the three
+ * sections sum exactly to the change in the Cash balance — which the result asserts (`reconciled`).
+ */
+export async function cashFlow(tenantId: string, from: string, to: string): Promise<CashFlowStatement> {
+  const rows = await query<{ type: string; code: string; name: string; flow: string }>(
+    `WITH cash_entries AS (
+       SELECT DISTINCT l.entry_id
+         FROM journal_lines l
+         JOIN accounts a ON a.id = l.account_id
+         JOIN journal_entries e ON e.id = l.entry_id
+        WHERE l.tenant_id = $1 AND a.code = '1010' AND e.entry_date BETWEEN $2 AND $3
+     )
+     SELECT a.type, a.code, a.name, COALESCE(SUM(l.credit_cents - l.debit_cents), 0)::bigint AS flow
+       FROM journal_lines l
+       JOIN accounts a ON a.id = l.account_id
+      WHERE l.tenant_id = $1 AND a.code <> '1010' AND l.entry_id IN (SELECT entry_id FROM cash_entries)
+      GROUP BY a.type, a.code, a.name
+      ORDER BY a.code`,
+    [tenantId, from, to]
+  );
+
+  const cat = (type: string, code: string): "operating" | "investing" | "financing" => {
+    if (type === "equity") return "financing";
+    if (type === "asset") return code === "1200" || code === "1500" ? "operating" : "investing";
+    return "operating"; // revenue, expense, liability (current) → operating
+  };
+  const operating: CashFlowLine[] = [];
+  const investing: CashFlowLine[] = [];
+  const financing: CashFlowLine[] = [];
+  let operatingCents = 0, investingCents = 0, financingCents = 0;
+  for (const r of rows) {
+    const amt = n(r.flow);
+    if (amt === 0) continue;
+    const line: CashFlowLine = { code: r.code, name: r.name, amountCents: amt };
+    const c = cat(r.type, r.code);
+    if (c === "operating") { operating.push(line); operatingCents += amt; }
+    else if (c === "investing") { investing.push(line); investingCents += amt; }
+    else { financing.push(line); financingCents += amt; }
+  }
+
+  const cash = await query<{ beginning: string; ending: string }>(
+    `SELECT COALESCE(SUM(l.debit_cents - l.credit_cents) FILTER (WHERE e.entry_date < $2), 0)::bigint AS beginning,
+            COALESCE(SUM(l.debit_cents - l.credit_cents) FILTER (WHERE e.entry_date <= $3), 0)::bigint AS ending
+       FROM journal_lines l
+       JOIN accounts a ON a.id = l.account_id
+       JOIN journal_entries e ON e.id = l.entry_id
+      WHERE l.tenant_id = $1 AND a.code = '1010'`,
+    [tenantId, from, to]
+  );
+  const beginningCashCents = n(cash[0].beginning);
+  const endingCashCents = n(cash[0].ending);
+  const netChangeCents = operatingCents + investingCents + financingCents;
+  const reconciled = netChangeCents === endingCashCents - beginningCashCents;
+  return {
+    from,
+    to,
+    operating,
+    investing,
+    financing,
+    operatingCents,
+    investingCents,
+    financingCents,
+    netChangeCents,
+    beginningCashCents,
+    endingCashCents,
+    reconciled,
+  };
 }
 
 /** Current stock position (not date-ranged). */

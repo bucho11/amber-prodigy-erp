@@ -711,6 +711,26 @@ export interface BalanceSheet {
   outOfBalanceCents: number;
   balanced: boolean;
 }
+export interface CashFlowLine {
+  code: string;
+  name: string;
+  amountCents: number; // signed; >0 = cash in, <0 = cash out
+}
+export interface CashFlowStatement {
+  from: string;
+  to: string;
+  operating: CashFlowLine[];
+  investing: CashFlowLine[];
+  financing: CashFlowLine[];
+  operatingCents: number;
+  investingCents: number;
+  financingCents: number;
+  netChangeCents: number;
+  beginningCashCents: number;
+  endingCashCents: number;
+  /** beginning + netChange === ending AND operating+investing+financing === netChange. */
+  reconciled: boolean;
+}
 export interface LowStockItem {
   id: string;
   name: string;

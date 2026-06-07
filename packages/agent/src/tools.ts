@@ -15,6 +15,7 @@ import {
   createBill,
   payBill,
   receivablesAging,
+  cashFlow,
   inventorySnapshot,
   createSoapNote,
   bookAppointmentChecked,
@@ -309,6 +310,27 @@ const TOOLS: AgentTool[] = [
     parse: (input) => ({ billId: reqStr((input as { billId?: unknown })?.billId, "billId") }),
     handler: ({ actor }, input) => payBill(actor.tenantId, (input as { billId: string }).billId),
     preview: (input) => `Pay open bill #${(input as { billId: string }).billId} (debit Accounts Payable, credit Cash).`,
+  },
+  {
+    name: "cash_flow_statement",
+    description:
+      "Direct-method cash flow statement for a date range (defaults to the current month): cash from operating, investing, and financing activities, plus beginning/ending cash. Call this for 'where did our cash go', 'cash flow', or runway questions. Dates are YYYY-MM-DD.",
+    permission: "reports.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return { from: optDate(i.from, monthStart()), to: optDate(i.to, today()) };
+    },
+    handler: ({ actor }, input) => cashFlow(actor.tenantId, (input as { from: string }).from, (input as { to: string }).to),
+    summarize: (r) => {
+      const c = r as { operatingCents: number; investingCents: number; financingCents: number; netChangeCents: number; beginningCashCents: number; endingCashCents: number };
+      return `Cash flow: operating ${usd(c.operatingCents)}, investing ${usd(c.investingCents)}, financing ${usd(c.financingCents)}; net change ${usd(c.netChangeCents)} (cash ${usd(c.beginningCashCents)} → ${usd(c.endingCashCents)}).`;
+    },
   },
   {
     name: "receivables_aging",

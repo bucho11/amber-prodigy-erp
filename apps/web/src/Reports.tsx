@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import type { IncomeSummary, InventorySnapshot, ReceivablesAging, SalesSummary } from "@prodigy/contracts";
+import type { CashFlowStatement, IncomeSummary, InventorySnapshot, ReceivablesAging, SalesSummary } from "@prodigy/contracts";
 
 const fmt = (cents: number): string => `${cents < 0 ? "-" : ""}$${(Math.abs(cents) / 100).toFixed(2)}`;
 const todayStr = (): string => new Date().toISOString().slice(0, 10);
@@ -22,6 +22,7 @@ export function ReportsPage() {
   const [income, setIncome] = useState<IncomeSummary | null>(null);
   const [inv, setInv] = useState<InventorySnapshot | null>(null);
   const [aging, setAging] = useState<ReceivablesAging | null>(null);
+  const [cash, setCash] = useState<CashFlowStatement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -29,16 +30,18 @@ export function ReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [s, i, v, ar] = await Promise.all([
+      const [s, i, v, ar, cf] = await Promise.all([
         api<{ salesSummary: SalesSummary }>(`/reports/sales?from=${f}&to=${t}`),
         api<{ incomeSummary: IncomeSummary }>(`/reports/income?from=${f}&to=${t}`),
         api<{ inventorySnapshot: InventorySnapshot }>(`/reports/inventory`),
         api<{ aging: ReceivablesAging }>(`/reports/receivables-aging`),
+        api<{ cashFlow: CashFlowStatement }>(`/reports/cash-flow?from=${f}&to=${t}`),
       ]);
       setSales(s.salesSummary);
       setIncome(i.incomeSummary);
       setInv(v.inventorySnapshot);
       setAging(ar.aging);
+      setCash(cf.cashFlow);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -215,6 +218,69 @@ export function ReportsPage() {
             </table>
             <p className="muted small">Reflects what&rsquo;s posted to the ledger in this range, on an accrual basis (dues recognized when invoiced).</p>
           </>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Cash flow</h2>
+        <p className="muted small">Where cash came from and went this range (direct method). Operating + investing + financing = the change in cash.</p>
+        {cash && (
+          <table className="data-table">
+            <tbody>
+              <tr className="total-row">
+                <td>Operating activities</td>
+                <td className="num">{fmt(cash.operatingCents)}</td>
+              </tr>
+              {cash.operating.map((l) => (
+                <tr key={l.code}>
+                  <td>
+                    <span className="muted small">{l.code}</span> {l.name}
+                  </td>
+                  <td className="num">{fmt(l.amountCents)}</td>
+                </tr>
+              ))}
+              {cash.investing.length > 0 && (
+                <tr className="total-row">
+                  <td>Investing activities</td>
+                  <td className="num">{fmt(cash.investingCents)}</td>
+                </tr>
+              )}
+              {cash.investing.map((l) => (
+                <tr key={l.code}>
+                  <td>
+                    <span className="muted small">{l.code}</span> {l.name}
+                  </td>
+                  <td className="num">{fmt(l.amountCents)}</td>
+                </tr>
+              ))}
+              <tr className="total-row">
+                <td>Financing activities</td>
+                <td className="num">{fmt(cash.financingCents)}</td>
+              </tr>
+              {cash.financing.map((l) => (
+                <tr key={l.code}>
+                  <td>
+                    <span className="muted small">{l.code}</span> {l.name}
+                  </td>
+                  <td className="num">{fmt(l.amountCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="muted small">Beginning cash</td>
+                <td className="num muted small">{fmt(cash.beginningCashCents)}</td>
+              </tr>
+              <tr className="total-row">
+                <td>Net change in cash</td>
+                <td className="num">{fmt(cash.netChangeCents)}</td>
+              </tr>
+              <tr className="total-row">
+                <td>Ending cash</td>
+                <td className="num">{fmt(cash.endingCashCents)}</td>
+              </tr>
+            </tfoot>
+          </table>
         )}
       </section>
 

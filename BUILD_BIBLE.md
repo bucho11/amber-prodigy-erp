@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~37%** | **~87%** | **BL-031 — Cash Flow statement (direct method) → the big-3 statements are complete.** Web-researched the method choice (direct is recommended for small/service businesses + exact given our transaction-level GL). `cashFlow(from,to)` categorizes every Cash-touching journal entry by its counterpart (revenue/expense/A-R/A-P/current-liability → Operating; equity → Financing; long-term assets → Investing) so the three sections sum exactly to the change in Cash. `cash_flow_statement` agent tool, `GET /reports/cash-flow`, Reports "Cash flow" section. Test asserts it reconciles (sections = net change = ending − beginning) AND ties to the Balance Sheet's Cash line. 56/56, eval 15 pass^1 100%. **P&L + Balance Sheet + Cash Flow all GL-derived and reconciling.** |
 | 2026-06-07 | **~36%** | **~86%** | **BL-030 — Accounts Receivable: accrual member dues + A/R aging (mirrors A/P).** Made membership dues **accrual**: invoicing posts Dr A/R (1200) / Cr Membership Revenue (4100); paying settles Dr Cash / Cr A/R — so the A/R aging reconciles to the Balance Sheet. New `receivablesAging(asOf)` with the standard buckets (Current / 1–30 / 31–60 / 61–90 / 90+, web-researched), `receivables_aging` agent tool, `GET /reports/receivables-aging`, and a Reports "Accounts receivable" section. 3 new money tests: dues accrue to A/R, aging total = ledger A/R, overdue bucketing, payment settles A/R, books balanced throughout. 55/55, eval 14 pass^1 100%. |
 | 2026-06-07 | **~35%** | **~85%** | **BL-029 — agent A/P write tools (create_bill, pay_bill) through the approval gate.** Brought the new A/P domain into the Agentic-OS: two approval-gated write tools with plain-language impact previews ("Enter a $1500.00 bill from vendor #7 to account 6200 — rent"). Gated test confirms no bill is created without sign-off + exact preview strings; eval `confirm-bill` scenario proves no unapproved write. 52/52, eval 13 pass^1 100%. |
 | 2026-06-07 | **~35%** | **~84%** | **BL-028 — Accounts Payable: vendors + bills (accrual A/P).** New domain: `vendors` + `bills` tables, `2000 Accounts Payable` account. Entering a bill posts Dr expense / Cr A/P; paying posts Dr A/P / Cr Cash — both atomic with the row (money path). End-to-end: contracts, `payables.ts` db module, `routes-payables.ts` (vendors/bills/pay/summary, `books.manage`/`financials.view`), `payables_summary` + `list_unpaid_bills` agent tools, and a Books "Bills" subtab (summary + open-bills list + Mark-paid + enter-bill w/ inline vendor add). New `payables.test.ts` (6 tests): A/P accrues + clears, books balanced throughout, reconciles to the Balance Sheet, double-pay + non-expense-account rejected. 51/51, audit clean, eval 12 runnable pass^1 100%. |
@@ -145,9 +146,9 @@ reality, not priors.
 - **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
   superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
 - **B5 — Back-office depth:** ~~A/R~~ ✅ BL-030 (accrual dues + aging), ~~A/P + vendors~~ ✅ BL-028
-  (bill-pay ACH rails-gated), bank reconciliation, financial statements (~~Balance Sheet~~ ✅ BL-026,
-  P&L = `incomeSummary`, Cash Flow pending), period close, cash-basis reporting toggle, payroll **calc**
-  → paystubs → checks → 1099/W-2 prep (ACH + filing rails-gated).
+  (bill-pay ACH rails-gated), bank reconciliation, ~~financial statements~~ ✅ **big-3 done** (Balance
+  Sheet BL-026, P&L BL-027, Cash Flow BL-031), period close, cash-basis reporting toggle, payroll
+  **calc** → paystubs → checks → 1099/W-2 prep (ACH + filing rails-gated).
 - **B6 — Front-of-house polish:** deposits (Stripe-gated), waitlist, classes, website/branded app,
   reviews/reputation, resources.
 - **B7 — AI CORE / Agentic OS** *(the differentiator; epic — starts right after the gate)*:
@@ -170,6 +171,31 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-031 (2026-06-07) — Cash Flow statement, direct method [completes the big-3 financial statements]
+WHAT: `cashFlow(tenantId, from, to)` (`reports.ts`) builds a direct-method Cash Flow from the GL. For
+every journal entry that touches Cash (1010) in the range, each non-cash counterpart line contributes
+(credit − debit) to cash flow, categorized: revenue/expense/A-R(1200)/inventory(1500)/current-liability
+→ Operating; equity → Financing; other (long-term) assets → Investing. Beginning/ending cash come from
+the 1010 balance before `from` / through `to`; the three section totals sum (by double-entry) exactly to
+the change in cash, asserted via `reconciled`. Wired: `CashFlowStatement`/`CashFlowLine` contracts,
+`cash_flow_statement` agent tool, `GET /reports/cash-flow`, and a Reports "Cash flow" section
+(operating/investing/financing lines + beginning/net/ending). Money-suite test asserts the statement
+reconciles (sections = net change = ending − beginning) and that ending cash ties to the Balance Sheet's
+Cash line.
+WHY/HOW: User said continue + always use web research. Researched direct vs. indirect (ICAEW, Fundbox,
+Ramp): the direct method is recommended for small/service businesses and is exact when you have
+transaction-level data — which we do, so it's both the better choice and the cleaner build (no non-cash
+estimation; reconciles perfectly). Only the operating section differs by method; investing/financing are
+identical either way. Completes the big-3 statements (P&L BL-027, Balance Sheet BL-026, Cash Flow here),
+all GL-derived and mutually reconciling — the core of the "replace QuickBooks" thesis.
+BOUNDARY: Categorization is by account type/code against our curated chart (all 2xxx liabilities are
+current → Operating; equity → Financing; we have no long-term debt or fixed-asset accounts, so Investing
+is empty until those exist). A multi-account chart with long-term debt / fixed assets would need those
+codes mapped (straightforward extension). No indirect-method reconciliation view (net-income → cash) and
+no per-activity subtotaling beyond the three sections. Date granularity UTC-day, consistent with the
+other statements.
+GATES: typecheck PASS, build PASS, test 56/56 PASS, eval 15 runnable pass^1 100%, audit unchanged (Reports not in the covered set).
 
 ### BL-030 (2026-06-07) — Accounts Receivable: accrual member dues + aging [mirrors A/P; researched]
 WHAT: Made membership dues recognition **accrual** to give a real A/R. `postMembershipInvoiceAccrual`
