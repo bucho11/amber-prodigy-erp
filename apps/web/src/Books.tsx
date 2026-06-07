@@ -20,7 +20,7 @@ const SOURCE_LABEL: Record<string, string> = {
 export function BooksPage() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission("books.manage");
-  const [tab, setTab] = useState<"trial" | "journal" | "accounts">("trial");
+  const [tab, setTab] = useState<"trial" | "journal" | "expense" | "accounts">("trial");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const loadAccounts = () => api<{ accounts: Account[] }>("/accounts").then((r) => setAccounts(r.accounts)).catch(() => {});
   useEffect(() => {
@@ -36,12 +36,18 @@ export function BooksPage() {
         <button className={tab === "journal" ? "subtab active" : "subtab"} onClick={() => setTab("journal")}>
           Journal
         </button>
+        {canWrite && (
+          <button className={tab === "expense" ? "subtab active" : "subtab"} onClick={() => setTab("expense")}>
+            Expenses
+          </button>
+        )}
         <button className={tab === "accounts" ? "subtab active" : "subtab"} onClick={() => setTab("accounts")}>
           Chart of accounts
         </button>
       </div>
       {tab === "trial" && <TrialBalanceView />}
       {tab === "journal" && <JournalView accounts={accounts} canWrite={canWrite} />}
+      {tab === "expense" && canWrite && <ExpensesView accounts={accounts} />}
       {tab === "accounts" && <AccountsView accounts={accounts} canWrite={canWrite} onChange={loadAccounts} />}
     </>
   );
@@ -310,6 +316,81 @@ function JournalView({ accounts, canWrite }: { accounts: Account[]; canWrite: bo
         </ul>
       </section>
     </>
+  );
+}
+
+function ExpensesView({ accounts }: { accounts: Account[] }) {
+  const expenseAccounts = useMemo(() => accounts.filter((a) => a.type === "expense" && a.isActive), [accounts]);
+  const [code, setCode] = useState("");
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [date, setDate] = useState(todayStr());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  const submit = async () => {
+    setError(null);
+    setDone(null);
+    if (!code) return setError("Choose an expense account.");
+    const cents = dollarsToCents(amount);
+    if (cents <= 0) return setError("Enter an amount greater than zero.");
+    if (!memo.trim()) return setError("Add a short memo.");
+    setSaving(true);
+    try {
+      await api("/expenses", "POST", { expenseAccountCode: code, amountCents: cents, memo: memo.trim(), date });
+      setDone(`Recorded ${fmt(cents)} — ${memo.trim()}.`);
+      setAmount("");
+      setMemo("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="card">
+      <h2>Record an expense</h2>
+      <p className="muted small">
+        Log money paid out. This posts a balanced entry &mdash; debits the expense account and credits Cash.
+      </p>
+      <div className="form-row">
+        <label className="field">
+          <span>Expense account</span>
+          <select className="input" value={code} onChange={(e) => setCode(e.target.value)}>
+            <option value="">Choose&hellip;</option>
+            {expenseAccounts.map((a) => (
+              <option key={a.id} value={a.code}>
+                {a.code} &middot; {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field" style={{ maxWidth: 150 }}>
+          <span>Amount</span>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span className="dollar">$</span>
+            <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+        </label>
+        <label className="field" style={{ maxWidth: 170 }}>
+          <span>Date</span>
+          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </label>
+      </div>
+      <label className="field">
+        <span>Memo</span>
+        <input className="input" placeholder="What was this for?" value={memo} onChange={(e) => setMemo(e.target.value)} />
+      </label>
+      {error && <p className="bad small">{error}</p>}
+      {done && <p className="muted small">&#10003; {done}</p>}
+      <div className="editor-actions">
+        <button className="btn primary" disabled={saving} onClick={() => void submit()}>
+          {saving ? "Saving…" : "Record expense"}
+        </button>
+      </div>
+    </section>
   );
 }
 

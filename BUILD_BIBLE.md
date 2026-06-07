@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~26%** | **~73%** | **BL-017 — Expenses UI + API (humans, not just the agent).** `POST /api/expenses` (books.manage) + a one-click "Expenses" subtab/form in Books (pick expense account → amount → memo → date → balanced entry). Completes `recordExpense` across the stack (db→agent→API→UI). 38/38 green. |
 | 2026-06-07 | **~26%** | **~72%** | **BL-016 — back-office depth: record_expense (agent-callable bookkeeping).** New `recordExpense` ledger fn (Dr expense acct / Cr Cash, balanced, validates account is expense-type) + `record_expense` agent tool (books.manage, approval). The agent can now do real bookkeeping with human sign-off. 38/38 green (verified: balanced entry, wrong-account rejected, books balance). |
 | 2026-06-07 | **~26%** | **~71%** | **BL-015 — agent-action history (governance/transparency).** `listAgentApprovals` gained a `decided` filter; new `listRecentDecidedApprovals` + `GET /api/ai/approvals/history`; Assistant now shows a "Recent agent actions" log (Approved & ran / Rejected / Failed) beneath the pending inbox. Owners can audit what the AI proposed and how it was decided. 37/37 green; audit re-run 0 axe violations. |
 | 2026-06-07 | **~26%** | **~70%** | **BL-014 — agent can BOOK appointments (safely).** New `bookAppointmentChecked` db fn (variant lookup → **double-booking guard** [`findConflict`, the same one the calendar uses] → create) + `book_appointment` agent tool (scheduling.manage, approval). The AI-receptionist capability the leaders lead with — but conflict-prevention is enforced (research: the hard requirement) and it's human-approved. 36/36 green (verified: conflict rejected, exactly one appt written). **Metric B crossed 70%.** |
@@ -144,6 +145,22 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-017 (2026-06-07) — Expenses UI + API: one-click expense entry in Books [the feature, human-usable]
+WHAT: `POST /api/expenses` (requireAuth + books.manage) → `recordExpense` (LedgerError already maps to
+400). New "Expenses" subtab in `Books.tsx` (shown to books.manage users) — a `ExpensesView` form: pick
+an expense-type account, enter amount + memo + date, post a balanced Dr expense / Cr Cash entry, with a
+success confirmation. Reuses the existing form/field/input/button patterns.
+WHY/HOW: BL-016 gave the *agent* expense recording; this makes it human-usable directly — completing the
+feature across db → agent → API → UI (the same `recordExpense` core, one source of truth, P7). A
+one-click expense form is far friendlier than balancing a manual journal entry by hand, which is what
+Books required before. Account dropdown is filtered to expense-type accounts so you can't mis-post.
+BOUNDARY: The Books/Expenses screen isn't in the live-audit screenshot set yet (the harness captures
+login/dashboard/assistant/public-booking) — it reuses already-audited components, but a dedicated axe
+pass on Books is a follow-up (extend the harness route list). The new HTTP route isn't unit-tested at
+the HTTP layer (consistent with the other routes); `recordExpense` underneath is fully unit-tested.
+Still cash-basis (credits Cash; no A/P).
+GATES: typecheck PASS, build PASS, test 38/38 PASS.
 
 ### BL-016 (2026-06-07) — Back-office depth: record_expense (agent-callable bookkeeping) [the agent keeps the books]
 WHAT: New `recordExpense(tenantId, {expenseAccountCode, amountCents, memo, date?})` in `ledger.ts` —

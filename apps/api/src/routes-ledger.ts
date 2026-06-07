@@ -7,6 +7,7 @@ import {
   listJournalEntries,
   getJournalEntry,
   trialBalance,
+  recordExpense,
   ACCOUNT_TYPES,
 } from "@prodigy/db";
 import type { AccountType, JournalLineInput } from "@prodigy/contracts";
@@ -111,6 +112,24 @@ export function registerLedgerRoutes(api: Router): void {
           sourceId: null,
           lines,
         }),
+      });
+    })
+  );
+
+  // One-click expense: posts a balanced Dr <expense> / Cr Cash entry (validated in recordExpense).
+  api.post(
+    "/expenses",
+    requireAuth,
+    requirePermission("books.manage"),
+    wrap(async (req, res) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const expenseAccountCode = reqString(b.expenseAccountCode, "expenseAccountCode");
+      const amountCents = reqInt(b.amountCents, "amountCents", 1);
+      const memo = reqString(b.memo, "memo");
+      const date = optString(b.date);
+      if (date && !DATE_RE.test(date)) throw new ValidationError("date must be YYYY-MM-DD.");
+      res.status(201).json({
+        entry: await recordExpense(userOf(req).tenantId, { expenseAccountCode, amountCents, memo, date: date ?? undefined }),
       });
     })
   );
