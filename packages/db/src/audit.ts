@@ -130,7 +130,7 @@ export async function verifyAuditChain(tenantId: string): Promise<{ intact: bool
   }>(
     `SELECT id::text AS id, tenant_id::text AS tenant_id, actor_user_id::text AS actor_user_id, action,
             resource_type, resource_id, client_id::text AS client_id, detail, entry_ts, prev_hash, hash
-     FROM audit_log WHERE tenant_id = $1 ORDER BY id ASC`,
+     FROM audit_log WHERE tenant_id = $1 ORDER BY audit_log.id ASC`,
     [tenantId]
   );
   let prev = "";

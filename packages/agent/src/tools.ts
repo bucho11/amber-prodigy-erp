@@ -5,6 +5,11 @@ import {
   listGiftCards,
   issueGiftCard,
   createClient,
+  listClients,
+  listAppointments,
+  salesSummary,
+  incomeSummary,
+  inventorySnapshot,
   type ClientInput,
 } from "@prodigy/db";
 import type { AgentActor, AgentTool, ToolDefinition } from "./types";
@@ -24,6 +29,22 @@ function reqInt(v: unknown, field: string, min = Number.MIN_SAFE_INTEGER): numbe
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
   if (!Number.isInteger(n) || n < min) throw new ToolInputError(`'${field}' must be an integer ≥ ${min}.`);
   return n;
+}
+const isoDay = (d: Date): string => d.toISOString().slice(0, 10);
+function optDate(v: unknown, fallback: string): string {
+  if (v === undefined || v === null || v === "") return fallback;
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new ToolInputError("Dates must be YYYY-MM-DD.");
+  return v;
+}
+function monthStart(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
+function today(): string {
+  return isoDay(new Date());
+}
+function tomorrow(): string {
+  return isoDay(new Date(Date.now() + 24 * 60 * 60 * 1000));
 }
 
 /**
@@ -75,6 +96,82 @@ const TOOLS: AgentTool[] = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     parse: () => ({}),
     handler: ({ actor }) => listGiftCards(actor.tenantId, {}),
+  },
+  {
+    name: "find_client",
+    description:
+      "Search clients by name, email, or phone. Call this to look someone up before answering about a specific client. Returns up to 20 matches.",
+    permission: "clients.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { search: { type: "string", description: "Name, email, or phone fragment" } },
+      required: ["search"],
+      additionalProperties: false,
+    },
+    parse: (input) => ({ search: reqStr((input as { search?: unknown })?.search, "search") }),
+    handler: ({ actor }, input) => listClients(actor.tenantId, { search: (input as { search: string }).search, limit: 20 }),
+  },
+  {
+    name: "list_appointments",
+    description:
+      "List appointments in a date range (defaults to today). Call this for schedule/calendar questions like what's booked today or this week. Dates are YYYY-MM-DD.",
+    permission: "scheduling.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return { from: optDate(i.from, today()), to: optDate(i.to, tomorrow()) };
+    },
+    handler: ({ actor }, input) => listAppointments(actor.tenantId, input as { from: string; to: string }),
+  },
+  {
+    name: "sales_summary",
+    description:
+      "Sales summary for a date range (defaults to the current month): net sales, tax, tips, discounts, payments by method, refunds. Call this for revenue/sales questions. Dates are YYYY-MM-DD.",
+    permission: "reports.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return { from: optDate(i.from, monthStart()), to: optDate(i.to, today()) };
+    },
+    handler: ({ actor }, input) => salesSummary(actor.tenantId, (input as { from: string }).from, (input as { to: string }).to),
+  },
+  {
+    name: "income_summary",
+    description:
+      "Income (P&L) summary from the ledger for a date range (defaults to the current month): revenue, expenses, and net income by account. Call this for profit/expense questions. Dates are YYYY-MM-DD.",
+    permission: "reports.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return { from: optDate(i.from, monthStart()), to: optDate(i.to, today()) };
+    },
+    handler: ({ actor }, input) => incomeSummary(actor.tenantId, (input as { from: string }).from, (input as { to: string }).to),
+  },
+  {
+    name: "inventory_snapshot",
+    description:
+      "Current inventory snapshot: stock value at cost and retail, out-of-stock count, and the low-stock list. Call this for stock/inventory questions.",
+    permission: "inventory.view",
+    risk: "auto",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    parse: () => ({}),
+    handler: ({ actor }) => inventorySnapshot(actor.tenantId),
   },
   {
     name: "create_client",
