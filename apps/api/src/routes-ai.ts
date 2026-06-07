@@ -1,7 +1,7 @@
 import type { Request, Router } from "express";
-import { aiStatus } from "@prodigy/ai";
-import { toolDefinitions, type AgentActor } from "@prodigy/agent";
-import { wrap } from "./http";
+import { aiStatus, createAiProvider } from "@prodigy/ai";
+import { toolDefinitions, runAgent, type AgentActor } from "@prodigy/agent";
+import { reqString, wrap } from "./http";
 import { requireAuth, userOf } from "./security";
 
 /** Build the agent's acting identity from the authenticated user (same RBAC the UI enforces). */
@@ -36,6 +36,19 @@ export function registerAiRoutes(api: Router): void {
     requireAuth,
     wrap(async (req, res) => {
       res.json({ tools: toolDefinitions(actorOf(req)) });
+    })
+  );
+
+  // Run the agent for one user message. Read tools auto-run (RBAC-gated); write tools pause for
+  // approval (status "needs_approval") — this endpoint never auto-approves. With no key the inert
+  // simulated provider answers, so the surface works end-to-end before any credential.
+  api.post(
+    "/ai/agent",
+    requireAuth,
+    wrap(async (req, res) => {
+      const message = reqString(req.body?.message, "message");
+      const run = await runAgent(createAiProvider(), actorOf(req), message);
+      res.json(run);
     })
   );
 }

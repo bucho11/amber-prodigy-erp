@@ -6,20 +6,46 @@
  * buildable and testable with no key; ClaudeAiProvider is the real implementation, selected by
  * one factory when ANTHROPIC_API_KEY is set. The LLM key is NOT a regulated rail — it can go live
  * mid-build — but money/SMS/payroll rails still go last.
+ *
+ * Tool-use shapes mirror the Anthropic Messages API (text / tool_use / tool_result blocks) so the
+ * ClaudeAiProvider maps 1:1 and the SimulatedAiProvider can emit deterministic tool calls.
  */
 
 export type AiProviderKind = "simulated" | "claude";
 
+/** A tool the model may call (name + description + JSON Schema for the input). */
+export interface AiToolSpec {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/** A tool call the model emitted. */
+export interface AiToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+}
+
+/** Conversation content blocks (a superset of plain text, for tool-use turns). */
+export type AiContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: unknown }
+  | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean };
+
 export interface AiMessage {
   role: "user" | "assistant";
-  content: string;
+  /** Plain string for simple turns, or blocks for tool-use turns. */
+  content: string | AiContentBlock[];
 }
 
 export interface AiCompletionRequest {
   /** System prompt — the agent's instructions / persona. */
   system?: string;
-  /** Conversation so far (must start with a user turn, alternating). */
+  /** Conversation so far (must start with a user turn). */
   messages: AiMessage[];
+  /** Tools the model may call this turn. */
+  tools?: AiToolSpec[];
   /** Output ceiling; defaults to a sensible value per provider. */
   maxTokens?: number;
 }
@@ -31,6 +57,8 @@ export interface AiUsage {
 
 export interface AiCompletionResult {
   text: string;
+  /** Tool calls the model wants executed (empty when it answered directly). */
+  toolCalls: AiToolCall[];
   provider: AiProviderKind;
   model: string;
   /** True when this came from the inert simulated seam (P10 — never mistake simulated for live). */

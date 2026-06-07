@@ -41,6 +41,9 @@ async function main(): Promise<void> {
 
     const agentSuite = await import("./suites/agent.test");
     await agentSuite.run(db, t);
+
+    const agentLoopSuite = await import("./suites/agent-loop.test");
+    await agentLoopSuite.run(db, t);
     ok = t.summary();
   } finally {
     if (ephemeral) {

@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~20%** | **~55%** | **BL-006 — the LLM agent loop (the differentiator runs).** Extended the provider seam for tool-use (text/tool_use/tool_result blocks; SimulatedAiProvider emits deterministic tool calls). New `runAgent` orchestrator: manual tool-use loop over the registry with research-backed guardrails — hard step cap + early-stopping synthesis, repeat-call detector, approval pauses. `POST /api/ai/agent` runs it (simulated until a key drops). 5 loop tests green (25/25). The Agentic OS now *operates*, end to end, with no key. Next: a persisted approval queue + the conversational UI surface. |
 | 2026-06-07 | **~19%** | **~50%** | **BL-005 — Agentic-OS runtime: audited, RBAC-gated tool registry.** `@prodigy/agent` — typed tools wrapping the real db modules (books/POS/gift cards/CRM), `executeTool` choke point enforcing server-side RBAC → input validation → **pre-execution approval gate** (money/clinical/outward pause for human sign-off) → execute → tamper-evident audit. `/api/ai/tools` exposes the catalog with per-actor `allowed`. 8 runtime tests green (20/20 total). Next: the LLM-driven agent loop (tool-use) over this registry. |
 | 2026-06-07 | **~18%** | **~46%** | **BL-004 — AI core foundation, step 1: provider seam.** `@prodigy/ai` (AiProvider interface + deterministic SimulatedAiProvider + ClaudeAiProvider behind one factory, model `claude-opus-4-8`); `/api/ai/status` surfaces live-vs-simulated; 5 seam tests green. The Agentic OS can now be built+tested with no key (P11). Next: agent runtime + audited tool registry. Research: modelled the agent surface on Zenoti's 9-agent "AI Workforce" + Mangomint Flows. |
 | 2026-06-07 | **~17%** | **~43%** | **BL-003 — reproducible gate landed.** Committed live-DB test harness (ephemeral Postgres, 7/7 money-path tests green), type-gated test code, GitHub Actions CI (typecheck+build+test), and an inert live-audit harness scaffold. B1 done. Small bump: the foundation is now verifiable + CI-guarded (de-risks everything downstream), but no user-facing feature shipped. Next: AI core foundation. |
@@ -132,6 +133,28 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-006 (2026-06-07) — The LLM-driven agent loop over the registry [the Agentic OS now operates]
+WHAT: Extended the AI provider seam for tool-use — `AiToolSpec`/`AiToolCall` + text/tool_use/tool_result
+content blocks on `AiMessage`, `tools` on the request, `toolCalls` on the result; `SimulatedAiProvider`
+now emits deterministic tool calls (a `call:<tool> {json}` directive) and synthesizes a final answer
+after tool results; `ClaudeAiProvider` maps the same shapes 1:1 to the Anthropic Messages API. New
+`runAgent()` orchestrator (`packages/agent/src/orchestrator.ts`): the manual tool-use loop — offer the
+actor's permitted tools, run the model, execute its tool calls via `executeTool`, feed results back,
+loop. `POST /api/ai/agent` runs it for one message. 5 loop tests (now 25/25).
+WHY/HOW: Web research on agent-loop guardrails (Steve Kinney / aiqnahub / Vellum) converged on
+defense-in-depth termination — so the loop has (1) a HARD step cap (1–25, default 8) with an
+**early-stopping synthesis** turn (no tools) so the user always gets an answer, (2) a **repeat-call
+detector** (same tool+args won't re-run), and (3) natural completion when the model stops calling
+tools. Approval-risk tools are surfaced as `needs_approval` and never executed in-loop (pre-execution
+approval, from BL-005). Only permitted tools are offered (defense in depth; `executeTool` still
+RBAC-checks). Tested entirely through the deterministic simulated provider — no key, no network (P11).
+The Claude path is built + typechecked but UNTESTED LIVE (cast at the SDK boundary; runs only with a key).
+BOUNDARY: No persisted approval queue yet — `needs_approval` returns the pending calls to the caller;
+a human re-invokes with approval (the durable queue + UI is next). `/api/ai/agent` is wired + builds but
+not yet covered by an automated HTTP test (the orchestrator logic is fully unit-tested; HTTP-level tests
+need the live-audit harness). No streaming; single-message turns (no conversation persistence yet).
+GATES: typecheck PASS, build PASS, test 25/25 PASS (7 money + 5 AI + 8 agent + 5 agent-loop).
 
 ### BL-005 (2026-06-07) — Agentic-OS runtime: audited, permission-scoped tool registry [the agent's security backbone]
 WHAT: New `@prodigy/agent` package — `AgentTool` registry (6 initial tools spanning books, POS, gift
