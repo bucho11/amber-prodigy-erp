@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~39%** | **~89%** | **BL-034 — clinical read tools for the agent (surface the chart, don't diagnose).** The agent could WRITE a SOAP note but couldn't READ the chart. Added `get_client_intake` + `list_soap_notes` (clinical.view-gated) that surface RECORDED health history (allergies, conditions, meds, injuries, areas to avoid, consent) — explicitly "recorded info, not medical advice; does not assess contraindications" (constitution Rule 6 made concrete; grounded in 2026 wellness-AI scope research). Test: surfaces recorded allergies/areas-to-avoid, front-desk denied (no clinical.view). 59/59, eval 16 pass^1 100%. Brings the clinical wedge into the Agentic OS, read-side. |
 | 2026-06-07 | **~38%** | **~88%** | **BL-033 — extend the live-audit to the financial UIs (raise the bar on what was built).** The audit covered Books' default + Expenses subtabs only, so the new Balance sheet / Bills / Reconcile UIs (BL-026/028/032) had no a11y coverage. Generalized the harness to capture every Books subtab → **19 screens (up from 14), all 0 axe violations.** Consolidation, not a feature: durable a11y coverage for the back-office surface I just shipped. |
 | 2026-06-07 | **~37%** | **~88%** | **BL-032 — Bank reconciliation (manual clearing).** Web-researched the cleared-vs-outstanding model. Added `cleared_at` to journal entries; `bankReconciliation(asOf)` splits cash transactions into cleared vs outstanding (book = cleared + outstanding; cleared should match the bank statement) and `setEntryCleared` toggles clearing (rejects non-cash entries). `GET /reports/bank-reconciliation`, `POST /journal/:id/cleared`, and a Books "Reconcile" subtab (tick transactions, enter statement balance → shows the difference). Test: book ties to the Balance Sheet cash, clearing updates the cleared balance, non-cash entries rejected. 58/58. |
 | 2026-06-07 | **~37%** | **~87%** | **BL-031 — Cash Flow statement (direct method) → the big-3 statements are complete.** Web-researched the method choice (direct is recommended for small/service businesses + exact given our transaction-level GL). `cashFlow(from,to)` categorizes every Cash-touching journal entry by its counterpart (revenue/expense/A-R/A-P/current-liability → Operating; equity → Financing; long-term assets → Investing) so the three sections sum exactly to the change in Cash. `cash_flow_statement` agent tool, `GET /reports/cash-flow`, Reports "Cash flow" section. Test asserts it reconciles (sections = net change = ending − beginning) AND ties to the Balance Sheet's Cash line. 56/56, eval 15 pass^1 100%. **P&L + Balance Sheet + Cash Flow all GL-derived and reconciling.** |
@@ -175,6 +176,29 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-034 (2026-06-07) — Clinical read tools for the agent [the wellness wedge, into the Agentic OS]
+WHAT: Added two `clinical.view`-gated agent READ tools: `get_client_intake` (reason for visit,
+conditions, medications, allergies, injuries/surgeries, pregnancy, pressure preference, areas to avoid,
+consent status) and `list_soap_notes` (a client's chart-note history — dates/providers, not the full
+clinical content). Both take a `clientId`. Their descriptions + summaries state plainly that they return
+RECORDED information only — not medical advice, and that they do not assess contraindications (defer to
+the provider). Test in agent.test: surfaces the recorded allergies + areas-to-avoid, lists SOAP notes,
+and front-desk (no `clinical.view`) is denied. Eval `sel-intake` tool-selection scenario.
+WHY/HOW: User said pivot to the clinical wedge + use research. Researched massage/bodywork intake
+standards (AMTA, MBLExGuide, Ruana) — the structured intake (allergies, meds, conditions, contraindication
+data, consent) and SOAP notes ALREADY existed in db/UI (slices 9/19), comprehensive. The real gap was
+agentic: the agent could write a SOAP note (`add_soap_note`) but had no way to READ the chart, so a
+provider couldn't ask "what's on file for this client before the session?". These reads close that,
+and are the cleanest possible embodiment of constitution Rule 6 (NOT A CLINICIAN): surface chart DATA,
+never diagnose. Reused the existing `getIntake`/`listSoapNotes` db fns + the `clinical.view` gate.
+BOUNDARY: Surfaces data only — deliberately no contraindication assessment or treatment suggestion
+(that would be medical advice; the live eval's `clinical-no-advice` rubric guards the boundary, pending a
+key). No tool to read a SOAP note's full S/O/A/P body yet (list only — opening a note is a provider UI
+action; a `get_soap_note` read could follow with care). The bigger B4 clinical items — dynamic form
+BUILDER, e-sign, body charts, superbill prep — remain (UI-heavy; future). Clinical access is already
+logged to the tamper-evident audit chain (slice 19); these reads ride that.
+GATES: typecheck PASS, build PASS, test 59/59 PASS, eval 16 runnable pass^1 100% (no UI change → audit unaffected).
 
 ### BL-033 (2026-06-07) — Extend the live-audit to the financial UIs [consolidation; raise the quality bar]
 WHAT: Generalized the audit harness's Books handling (`scripts/audit/audit.ts`) from "default tab +

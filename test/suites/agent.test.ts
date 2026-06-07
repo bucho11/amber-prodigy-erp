@@ -177,6 +177,38 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assert(summary.length < 200 && !summary.trim().startsWith("{"), "summary is a short sentence, not raw JSON");
   });
 
+  await t.test("clinical read tools surface RECORDED intake (data, not advice) and are clinical-gated", async () => {
+    const clients = await db.listClients(tenantId, { search: "Money", limit: 1 });
+    assert(clients.length > 0, "a client exists to chart");
+    const clientId = clients[0].id;
+    await db.upsertIntake(tenantId, clientId, {
+      reasonForVisit: "Lower back tension",
+      medicalConditions: "Hypertension",
+      medications: "Lisinopril",
+      allergies: "Lavender oil",
+      surgeries: null,
+      injuries: "Right shoulder strain (2024)",
+      pregnant: false,
+      pressurePreference: "Medium",
+      areasToAvoid: "Right shoulder",
+      notes: null,
+      consentToTreat: true,
+      signatureName: "Money Test Client",
+    });
+    const out = await executeTool(owner, "get_client_intake", { clientId });
+    assertEqual(out.status, "ok", "owner may read intake");
+    const intake = (out as { result: { hasIntake: boolean; allergies: string | null; areasToAvoid: string | null } }).result;
+    assert(intake.hasIntake, "intake is on file");
+    assertEqual(intake.allergies, "Lavender oil", "surfaces the recorded allergies (data)");
+    assertEqual(intake.areasToAvoid, "Right shoulder", "surfaces the recorded areas to avoid");
+    assertEqual((await executeTool(owner, "list_soap_notes", { clientId })).status, "ok", "owner may list SOAP notes");
+    assertEqual(
+      (await executeTool(frontDesk, "get_client_intake", { clientId })).status,
+      "denied",
+      "front desk is denied clinical intake (no clinical.view)"
+    );
+  });
+
   await t.test("every agent action landed on the tamper-evident audit chain (intact)", async () => {
     const chain = await db.verifyAuditChain(tenantId);
     assert(chain.intact, "audit chain intact after agent activity");

@@ -18,10 +18,13 @@ import {
   cashFlow,
   inventorySnapshot,
   createSoapNote,
+  getIntake,
+  listSoapNotes,
   bookAppointmentChecked,
   recordExpense,
   type ClientInput,
 } from "@prodigy/db";
+import type { ClientIntake, SoapNoteListItem } from "@prodigy/contracts";
 import type { AgentActor, AgentTool, ToolDefinition } from "./types";
 
 // ---- tiny input validators (throw on bad input; the message is surfaced to the caller) ----
@@ -148,6 +151,55 @@ const TOOLS: AgentTool[] = [
       if (cs.length === 0) return "No matching clients found.";
       const head = cs.slice(0, 5).map((c) => `${c.displayName}${c.email ? ` (${c.email})` : ""}`).join("; ");
       return `${cs.length} client(s): ${head}${cs.length > 5 ? `, +${cs.length - 5} more` : ""}.`;
+    },
+  },
+  {
+    name: "get_client_intake",
+    description:
+      "Look up a client's RECORDED health intake before a session: reason for visit, conditions, medications, allergies, injuries/surgeries, pregnancy, pressure preference, areas to avoid, and consent status. Needs clientId (find it first). This returns recorded information ONLY — it is not medical advice and does not assess contraindications or fitness for treatment; defer clinical judgment to the provider.",
+    permission: "clinical.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { clientId: { type: "string" } },
+      required: ["clientId"],
+      additionalProperties: false,
+    },
+    parse: (input) => ({ clientId: reqStr((input as { clientId?: unknown })?.clientId, "clientId") }),
+    handler: ({ actor }, input) => getIntake(actor.tenantId, (input as { clientId: string }).clientId),
+    summarize: (r) => {
+      const i = r as ClientIntake;
+      if (!i.hasIntake) return "No intake on file for this client yet.";
+      const flags: string[] = [];
+      if (i.allergies) flags.push(`allergies: ${i.allergies}`);
+      if (i.medicalConditions) flags.push(`conditions: ${i.medicalConditions}`);
+      if (i.medications) flags.push(`medications: ${i.medications}`);
+      if (i.injuries) flags.push(`injuries: ${i.injuries}`);
+      if (i.areasToAvoid) flags.push(`areas to avoid: ${i.areasToAvoid}`);
+      if (i.pregnant) flags.push("pregnant: yes");
+      const pressure = i.pressurePreference ? ` Pressure preference: ${i.pressurePreference}.` : "";
+      const consent = i.consentToTreat ? "Consent to treat on file." : "No consent on file.";
+      return `Recorded intake${flags.length ? ` — ${flags.join("; ")}.` : " (no health items recorded)."}${pressure} ${consent} (Recorded info, not medical advice.)`;
+    },
+  },
+  {
+    name: "list_soap_notes",
+    description:
+      "List a client's SOAP (chart) notes — date and provider — to see their visit/charting history. Needs clientId. Returns the list of notes (not their full clinical content); to read a note's details a provider opens it in the chart.",
+    permission: "clinical.view",
+    risk: "auto",
+    inputSchema: {
+      type: "object",
+      properties: { clientId: { type: "string" } },
+      required: ["clientId"],
+      additionalProperties: false,
+    },
+    parse: (input) => ({ clientId: reqStr((input as { clientId?: unknown })?.clientId, "clientId") }),
+    handler: ({ actor }, input) => listSoapNotes(actor.tenantId, (input as { clientId: string }).clientId),
+    summarize: (r) => {
+      const notes = r as SoapNoteListItem[];
+      if (notes.length === 0) return "No SOAP notes on file for this client.";
+      return `${notes.length} chart note(s); most recent ${notes[0].date}${notes[0].providerName ? ` by ${notes[0].providerName}` : ""}.`;
     },
   },
   {

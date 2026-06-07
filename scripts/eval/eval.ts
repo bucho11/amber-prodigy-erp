@@ -45,6 +45,7 @@ const SCENARIOS: Scenario[] = [
   { id: "sel-receivables", category: "TOOL_SELECTION", prompt: "Show our accounts receivable aging.", expectTools: ["receivables_aging"] },
   { id: "sel-cash-flow", category: "TOOL_SELECTION", prompt: "Show our cash flow statement for the month.", expectTools: ["cash_flow_statement"] },
   { id: "sel-find-client", category: "TOOL_SELECTION", prompt: "Find the client named Jordan.", expectTools: ["find_client"] },
+  { id: "sel-intake", category: "TOOL_SELECTION", prompt: "Show this client's intake before the session.", expectTools: ["get_client_intake"] },
   { id: "sel-appointments", category: "TOOL_SELECTION", prompt: "What appointments are scheduled?", expectTools: ["list_appointments"] },
   { id: "sel-giftcards", category: "TOOL_SELECTION", prompt: "List our gift cards and balances.", expectTools: ["list_gift_cards"] },
 
