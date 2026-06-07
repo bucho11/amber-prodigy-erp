@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~22%** | **~62%** | **BL-008 — the agent reaches the app: "Ask Prodigy" + approvals inbox.** New `Assistant.tsx` (assistive-copilot pattern): chat → `/api/ai/agent`, transparent tool-step trail, live-vs-simulated badge, and a pending-approvals inbox with Approve/Reject wired to `/api/ai/approvals`. Added an Assistant nav tab (all users; agent only exposes each user's permitted tools). Runtime-smoked: server boots, `agent_approvals` self-heals on boot, all AI routes wired + 401-gated. Next: activate the live-audit harness (screenshots/axe) on the new screens, then UI/design-system overhaul. |
 | 2026-06-07 | **~21%** | **~58%** | **BL-007 — durable approval queue (human-in-the-loop complete).** New `agent_approvals` table + `@prodigy/db` persistence + `@prodigy/agent` workflow (request → list pending → approve/reject). Approve executes once under the approver's RBAC through `executeTool` (validated, real db path, audited); pending-guarded against double-execute. `/api/ai/agent` now persists proposed writes; `GET/POST /api/ai/approvals[/:id/approve|reject]`. 5 tests green (30/30). The agentic propose→approve→execute→audit loop is end-to-end. Next: the conversational UI surface + approvals inbox. |
 | 2026-06-07 | **~20%** | **~55%** | **BL-006 — the LLM agent loop (the differentiator runs).** Extended the provider seam for tool-use (text/tool_use/tool_result blocks; SimulatedAiProvider emits deterministic tool calls). New `runAgent` orchestrator: manual tool-use loop over the registry with research-backed guardrails — hard step cap + early-stopping synthesis, repeat-call detector, approval pauses. `POST /api/ai/agent` runs it (simulated until a key drops). 5 loop tests green (25/25). The Agentic OS now *operates*, end to end, with no key. Next: a persisted approval queue + the conversational UI surface. |
 | 2026-06-07 | **~19%** | **~50%** | **BL-005 — Agentic-OS runtime: audited, RBAC-gated tool registry.** `@prodigy/agent` — typed tools wrapping the real db modules (books/POS/gift cards/CRM), `executeTool` choke point enforcing server-side RBAC → input validation → **pre-execution approval gate** (money/clinical/outward pause for human sign-off) → execute → tamper-evident audit. `/api/ai/tools` exposes the catalog with per-actor `allowed`. 8 runtime tests green (20/20 total). Next: the LLM-driven agent loop (tool-use) over this registry. |
@@ -134,6 +135,27 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-008 (2026-06-07) — "Ask Prodigy" assistant + approvals inbox in the web app [the agent becomes usable]
+WHAT: New `apps/web/src/Assistant.tsx` — a conversational assistant screen: a message thread that
+posts to `/api/ai/agent` and renders the answer plus a transparent per-tool step trail (ran / needs
+approval / denied / error, colour-dotted), a live-vs-simulated provider badge from `/api/ai/status`,
+and a **pending-approvals inbox** listing `/api/ai/approvals` with Approve/Reject buttons. Added an
+"Assistant" nav tab (visible to all authenticated users) + supporting CSS (incl. an `.sr-only` a11y
+helper). Web-local TS interfaces mirror the API shapes so no server package leaks into the browser bundle.
+WHY/HOW: Research (Microsoft HAX / uxforai / Clockwise) — the **assistive side-panel/screen copilot**
+is the right pattern for ongoing support; trust comes from transparency (show the steps + provider
+mode) and from confirmation on consequential actions (our approval inbox); "build the tool-calling
+layer first" (done in BL-004–007), chat UI last. Kept the voice direct, not faux-human, and made it
+explicit the human is in charge. Verified at runtime through the real Express app: server boots,
+`agent_approvals` self-heals on boot, `/api/health` 200, and `/api/ai/{status,tools,agent,approvals}`
+all return 401 (wired + auth-gated, not 404).
+BOUNDARY: No automated UI/DOM test or live screenshot yet — verification is build + a routing/auth
+HTTP smoke; the visual + axe pass waits on activating the live-audit harness (B2, next). With no
+ANTHROPIC_API_KEY the assistant answers via the simulated seam (the badge says so). No streaming /
+conversation persistence yet (each send is one turn; thread is client-side state). The approvals inbox
+shows pending only (no decided-history view yet).
+GATES: typecheck PASS (incl. web), build PASS (vite + api), test 30/30 PASS, runtime smoke green.
 
 ### BL-007 (2026-06-07) — Durable approval queue: human-in-the-loop, end to end [governance for autonomous actions]
 WHAT: New `agent_approvals` table (idempotent schema) + `@prodigy/db/approvals.ts` persistence

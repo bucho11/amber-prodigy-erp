@@ -16,6 +16,7 @@ import { MembershipsPage } from "./Memberships";
 import { PublicBooking } from "./PublicBooking";
 import { PublicManageBooking } from "./PublicManageBooking";
 import { AuditPage } from "./Audit";
+import { Assistant } from "./Assistant";
 
 export function App() {
   return (
@@ -50,7 +51,7 @@ function Root() {
   return <Shell />;
 }
 
-type Tab = "dashboard" | "schedule" | "protocols" | "clients" | "checkout" | "memberships" | "books" | "inventory" | "reports" | "services" | "team" | "audit";
+type Tab = "dashboard" | "assistant" | "schedule" | "protocols" | "clients" | "checkout" | "memberships" | "books" | "inventory" | "reports" | "services" | "team" | "audit";
 
 function Shell() {
   const { user, logout, hasPermission } = useAuth();
@@ -91,6 +92,9 @@ function Shell() {
           <div className="tabs">
             <button className={effectiveTab === "dashboard" ? "tab active" : "tab"} onClick={() => setTab("dashboard")}>
               Dashboard
+            </button>
+            <button className={effectiveTab === "assistant" ? "tab active" : "tab"} onClick={() => setTab("assistant")}>
+              Assistant
             </button>
             {canSchedule && (
               <button className={effectiveTab === "schedule" ? "tab active" : "tab"} onClick={() => setTab("schedule")}>
@@ -161,6 +165,7 @@ function Shell() {
       </div>
       <main className="shell">
         {effectiveTab === "dashboard" && <Dashboard />}
+        {effectiveTab === "assistant" && <Assistant />}
         {effectiveTab === "schedule" && <ScheduleAdmin />}
         {effectiveTab === "protocols" && <ProtocolsAdmin />}
         {effectiveTab === "clients" && <ClientsAdmin />}
