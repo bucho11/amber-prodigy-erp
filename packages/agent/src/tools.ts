@@ -10,6 +10,8 @@ import {
   salesSummary,
   incomeSummary,
   balanceSheet,
+  payablesSummary,
+  listBills,
   inventorySnapshot,
   createSoapNote,
   bookAppointmentChecked,
@@ -221,6 +223,35 @@ const TOOLS: AgentTool[] = [
     summarize: (r) => {
       const b = r as { totalAssetsCents: number; totalLiabilitiesCents: number; totalEquityCents: number; balanced: boolean };
       return `Balance sheet: assets ${usd(b.totalAssetsCents)} = liabilities ${usd(b.totalLiabilitiesCents)} + equity ${usd(b.totalEquityCents)}${b.balanced ? " (balanced)" : " (OUT OF BALANCE — investigate)"}.`;
+    },
+  },
+  {
+    name: "payables_summary",
+    description:
+      "What the business currently owes vendors: count and total of open (unpaid) bills, and the overdue subset. Call this for 'what do we owe', 'accounts payable', or 'are any bills overdue' questions.",
+    permission: "financials.view",
+    risk: "auto",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    parse: () => ({}),
+    handler: ({ actor }) => payablesSummary(actor.tenantId),
+    summarize: (r) => {
+      const s = r as { openCount: number; openCents: number; overdueCount: number; overdueCents: number };
+      return `Payables: ${s.openCount} open bill(s) totaling ${usd(s.openCents)}${s.overdueCount > 0 ? `, of which ${s.overdueCount} (${usd(s.overdueCents)}) are overdue` : " (none overdue)"}.`;
+    },
+  },
+  {
+    name: "list_unpaid_bills",
+    description:
+      "List the open (unpaid) bills owed to vendors — vendor, amount, due date. Call this when asked which bills are outstanding or what's due.",
+    permission: "financials.view",
+    risk: "auto",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    parse: () => ({}),
+    handler: ({ actor }) => listBills(actor.tenantId, { status: "open" }),
+    summarize: (r) => {
+      const bills = r as Array<{ vendorName: string; amountCents: number; dueDate: string }>;
+      if (bills.length === 0) return "No open bills — nothing owed to vendors right now.";
+      return `${bills.length} open bill(s): ${bills.slice(0, 5).map((b) => `${b.vendorName} ${usd(b.amountCents)} due ${b.dueDate}`).join("; ")}${bills.length > 5 ? "; …" : ""}.`;
     },
   },
   {

@@ -47,6 +47,9 @@ async function main(): Promise<void> {
 
     const approvalsSuite = await import("./suites/approvals.test");
     await approvalsSuite.run(db, t);
+
+    const payablesSuite = await import("./suites/payables.test");
+    await payablesSuite.run(db, t);
     ok = t.summary();
   } finally {
     if (ephemeral) {

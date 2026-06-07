@@ -575,6 +575,39 @@ export interface TrialBalance {
 }
 
 
+// ---- Accounts payable (vendors + bills) ----
+export interface Vendor {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+export interface Bill {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  expenseAccountId: string;
+  expenseAccountCode: string;
+  expenseAccountName: string;
+  billDate: string;
+  dueDate: string;
+  amountCents: number;
+  memo: string | null;
+  status: "open" | "paid" | "void";
+  paidAt: string | null;
+  createdAt: string;
+}
+export interface PayablesSummary {
+  openCount: number;
+  openCents: number;
+  overdueCount: number;
+  overdueCents: number;
+}
+
+
 // ---- Retail products / inventory ----
 export interface Product {
   id: string;

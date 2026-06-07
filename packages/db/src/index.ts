@@ -593,6 +593,34 @@ async function applySchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_membership_invoices ON membership_invoices(tenant_id, membership_id);
 
+    -- Accounts payable: vendors and the bills we owe them (BL-028).
+    CREATE TABLE IF NOT EXISTS vendors (
+      id         BIGSERIAL PRIMARY KEY,
+      tenant_id  BIGINT NOT NULL REFERENCES tenants(id),
+      name       TEXT NOT NULL,
+      email      TEXT,
+      phone      TEXT,
+      notes      TEXT,
+      is_active  BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_vendors_tenant ON vendors(tenant_id, name);
+
+    CREATE TABLE IF NOT EXISTS bills (
+      id                 BIGSERIAL PRIMARY KEY,
+      tenant_id          BIGINT NOT NULL REFERENCES tenants(id),
+      vendor_id          BIGINT NOT NULL REFERENCES vendors(id),
+      expense_account_id BIGINT NOT NULL REFERENCES accounts(id),
+      bill_date          DATE NOT NULL,
+      due_date           DATE NOT NULL,
+      amount_cents       INTEGER NOT NULL,
+      memo               TEXT,
+      status             TEXT NOT NULL DEFAULT 'open',   -- open | paid | void
+      paid_at            TIMESTAMPTZ,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_bills_tenant ON bills(tenant_id, status, due_date);
+
     -- Tamper-evident clinical-access audit log (slice 19). Each row chains to the prior via a hash.
     CREATE TABLE IF NOT EXISTS audit_log (
       id            BIGSERIAL PRIMARY KEY,
@@ -733,6 +761,7 @@ async function seedTenantOne(): Promise<void> {
        ('1010', 'Cash', 'asset', 'debit'),
        ('1200', 'Accounts Receivable', 'asset', 'debit'),
        ('1500', 'Inventory', 'asset', 'debit'),
+       ('2000', 'Accounts Payable', 'liability', 'credit'),
        ('2100', 'Sales Tax Payable', 'liability', 'credit'),
        ('2150', 'Gratuities Payable', 'liability', 'credit'),
        ('2200', 'Gift Card Liability', 'liability', 'credit'),
@@ -799,6 +828,7 @@ export * from "./packages";
 export * from "./ledger";
 export * from "./inventory";
 export * from "./reports";
+export * from "./payables";
 export * from "./memberships";
 export * from "./booking";
 export * from "./audit";

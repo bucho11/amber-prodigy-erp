@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { useAuth } from "./auth";
-import type { Account, AccountType, BalanceSheet, JournalEntry, JournalEntryListItem, TrialBalance } from "@prodigy/contracts";
+import type { Account, AccountType, BalanceSheet, Bill, JournalEntry, JournalEntryListItem, PayablesSummary, TrialBalance, Vendor } from "@prodigy/contracts";
 
 const fmt = (cents: number): string => {
   const v = (Math.abs(cents) / 100).toFixed(2);
@@ -20,7 +20,7 @@ const SOURCE_LABEL: Record<string, string> = {
 export function BooksPage() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission("books.manage");
-  const [tab, setTab] = useState<"trial" | "balance" | "journal" | "expense" | "accounts">("trial");
+  const [tab, setTab] = useState<"trial" | "balance" | "journal" | "bills" | "expense" | "accounts">("trial");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const loadAccounts = () => api<{ accounts: Account[] }>("/accounts").then((r) => setAccounts(r.accounts)).catch(() => {});
   useEffect(() => {
@@ -39,6 +39,9 @@ export function BooksPage() {
         <button className={tab === "journal" ? "subtab active" : "subtab"} onClick={() => setTab("journal")}>
           Journal
         </button>
+        <button className={tab === "bills" ? "subtab active" : "subtab"} onClick={() => setTab("bills")}>
+          Bills
+        </button>
         {canWrite && (
           <button className={tab === "expense" ? "subtab active" : "subtab"} onClick={() => setTab("expense")}>
             Expenses
@@ -51,6 +54,7 @@ export function BooksPage() {
       {tab === "trial" && <TrialBalanceView />}
       {tab === "balance" && <BalanceSheetView />}
       {tab === "journal" && <JournalView accounts={accounts} canWrite={canWrite} />}
+      {tab === "bills" && <BillsView accounts={accounts} canWrite={canWrite} />}
       {tab === "expense" && canWrite && <ExpensesView accounts={accounts} />}
       {tab === "accounts" && <AccountsView accounts={accounts} canWrite={canWrite} onChange={loadAccounts} />}
     </>
@@ -103,6 +107,208 @@ function TrialBalanceView() {
         </table>
       )}
     </section>
+  );
+}
+
+function BillsView({ accounts, canWrite }: { accounts: Account[]; canWrite: boolean }) {
+  const expenseAccounts = useMemo(() => accounts.filter((a) => a.type === "expense" && a.isActive), [accounts]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [bills, setBills] = useState<Bill[] | null>(null);
+  const [summary, setSummary] = useState<PayablesSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [vendorId, setVendorId] = useState("");
+  const [code, setCode] = useState("");
+  const [amount, setAmount] = useState("");
+  const [billDate, setBillDate] = useState(todayStr());
+  const [dueDate, setDueDate] = useState(todayStr());
+  const [memo, setMemo] = useState("");
+  const [newVendor, setNewVendor] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () =>
+    Promise.all([
+      api<{ bills: Bill[] }>("/bills"),
+      api<{ summary: PayablesSummary }>("/payables/summary"),
+      api<{ vendors: Vendor[] }>("/vendors?active=true"),
+    ])
+      .then(([b, s, v]) => {
+        setBills(b.bills);
+        setSummary(s.summary);
+        setVendors(v.vendors);
+      })
+      .catch((e) => setError((e as Error).message));
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const addVendor = async () => {
+    setError(null);
+    if (!newVendor.trim()) return;
+    try {
+      const r = await api<{ vendor: Vendor }>("/vendors", "POST", { name: newVendor.trim() });
+      setNewVendor("");
+      const v = await api<{ vendors: Vendor[] }>("/vendors?active=true");
+      setVendors(v.vendors);
+      setVendorId(r.vendor.id);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const submit = async () => {
+    setError(null);
+    if (!vendorId) return setError("Choose a vendor.");
+    if (!code) return setError("Choose an expense account.");
+    const cents = dollarsToCents(amount);
+    if (cents <= 0) return setError("Enter an amount greater than zero.");
+    setSaving(true);
+    try {
+      await api("/bills", "POST", { vendorId, expenseAccountCode: code, amountCents: cents, billDate, dueDate, memo: memo.trim() || null });
+      setAmount("");
+      setMemo("");
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const pay = async (id: string) => {
+    setError(null);
+    try {
+      await api(`/bills/${id}/pay`, "POST");
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  return (
+    <>
+      <section className="card">
+        <h2>Bills owed</h2>
+        {summary && (
+          <p className="muted small">
+            {summary.openCount} open bill{summary.openCount === 1 ? "" : "s"} totaling <strong>{fmt(summary.openCents)}</strong>
+            {summary.overdueCount > 0 ? (
+              <span className="bad"> · {summary.overdueCount} overdue ({fmt(summary.overdueCents)})</span>
+            ) : (
+              " · none overdue"
+            )}
+          </p>
+        )}
+        {error && <p className="bad small">{error}</p>}
+        {!bills && <p className="muted">Loading&hellip;</p>}
+        {bills && bills.length === 0 && <p className="muted small">No bills yet.</p>}
+        {bills && bills.length > 0 && (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Vendor</th>
+                <th>Account</th>
+                <th>Due</th>
+                <th className="num">Amount</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {bills.map((b) => (
+                <tr key={b.id} className={b.status === "paid" ? "muted" : ""}>
+                  <td>{b.vendorName}</td>
+                  <td>
+                    <span className="muted small">{b.expenseAccountCode}</span> {b.expenseAccountName}
+                  </td>
+                  <td>{b.dueDate}</td>
+                  <td className="num">{fmt(b.amountCents)}</td>
+                  <td className="num">
+                    {b.status === "open" ? (
+                      canWrite ? (
+                        <button className="link-btn" onClick={() => void pay(b.id)}>
+                          Mark paid
+                        </button>
+                      ) : (
+                        <span className="status-badge s-pending">Open</span>
+                      )
+                    ) : (
+                      <span className="status-badge s-completed">{b.status === "paid" ? "Paid" : b.status}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {canWrite && (
+        <section className="card">
+          <h2>Enter a bill</h2>
+          <p className="muted small">Records an unpaid bill &mdash; debits the expense and credits Accounts Payable. Marking it paid credits Cash.</p>
+          <div className="form-row">
+            <label className="field">
+              <span>Vendor</span>
+              <select className="input" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+                <option value="">Choose&hellip;</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Or add a vendor</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input className="input" placeholder="New vendor name" value={newVendor} onChange={(e) => setNewVendor(e.target.value)} />
+                <button className="btn" type="button" disabled={!newVendor.trim()} onClick={() => void addVendor()}>
+                  Add
+                </button>
+              </div>
+            </label>
+          </div>
+          <div className="form-row">
+            <label className="field">
+              <span>Expense account</span>
+              <select className="input" value={code} onChange={(e) => setCode(e.target.value)}>
+                <option value="">Choose&hellip;</option>
+                {expenseAccounts.map((a) => (
+                  <option key={a.id} value={a.code}>
+                    {a.code} &middot; {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field" style={{ maxWidth: 150 }}>
+              <span>Amount</span>
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <span className="dollar">$</span>
+                <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              </div>
+            </label>
+          </div>
+          <div className="form-row">
+            <label className="field" style={{ maxWidth: 180 }}>
+              <span>Bill date</span>
+              <input className="input" type="date" value={billDate} onChange={(e) => setBillDate(e.target.value)} />
+            </label>
+            <label className="field" style={{ maxWidth: 180 }}>
+              <span>Due date</span>
+              <input className="input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>Memo</span>
+              <input className="input" placeholder="What is this for?" value={memo} onChange={(e) => setMemo(e.target.value)} />
+            </label>
+          </div>
+          <div className="editor-actions">
+            <button className="btn primary" disabled={saving} onClick={() => void submit()}>
+              {saving ? "Saving…" : "Enter bill"}
+            </button>
+          </div>
+        </section>
+      )}
+    </>
   );
 }
 

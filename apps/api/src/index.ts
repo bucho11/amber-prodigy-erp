@@ -35,6 +35,7 @@ import { registerLedgerRoutes } from "./routes-ledger";
 import { registerInventoryRoutes } from "./routes-inventory";
 import { registerReportRoutes } from "./routes-reports";
 import { registerMembershipRoutes } from "./routes-memberships";
+import { registerPayableRoutes } from "./routes-payables";
 import { registerPublicRoutes } from "./routes-public";
 import { registerAuditRoutes } from "./routes-audit";
 import { registerAiRoutes } from "./routes-ai";
@@ -123,6 +124,9 @@ registerReportRoutes(api);
 
 // Membership routes.
 registerMembershipRoutes(api);
+
+// Accounts-payable routes (vendors + bills).
+registerPayableRoutes(api);
 
 // Public (unauthenticated) online-booking routes.
 registerPublicRoutes(api);

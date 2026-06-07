@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~35%** | **~84%** | **BL-028 — Accounts Payable: vendors + bills (accrual A/P).** New domain: `vendors` + `bills` tables, `2000 Accounts Payable` account. Entering a bill posts Dr expense / Cr A/P; paying posts Dr A/P / Cr Cash — both atomic with the row (money path). End-to-end: contracts, `payables.ts` db module, `routes-payables.ts` (vendors/bills/pay/summary, `books.manage`/`financials.view`), `payables_summary` + `list_unpaid_bills` agent tools, and a Books "Bills" subtab (summary + open-bills list + Mark-paid + enter-bill w/ inline vendor add). New `payables.test.ts` (6 tests): A/P accrues + clears, books balanced throughout, reconciles to the Balance Sheet, double-pay + non-expense-account rejected. 51/51, audit clean, eval 12 runnable pass^1 100%. |
 | 2026-06-07 | **~33%** | **~83%** | **BL-027 — P&L upgraded to show Gross Profit (COGS → Gross Profit → Operating Expenses → Net Income).** Additive fields on `IncomeSummary` (`cogsCents`/`grossProfitCents`/`operatingExpenseCents`) derived from the 5xxx COGS account coding; Reports income statement now splits COGS from operating expenses and shows gross profit. Test asserts the sub-totals reconcile. Completes the core financial-statements trio (P&L + Balance Sheet). 45/45. |
 | 2026-06-07 | **~33%** | **~82%** | **BL-026 — Balance Sheet (the missing core financial statement).** Built `balanceSheet(tenantId, asOf)` from the GL — assets/liabilities/equity as of a date, with net-income-to-date folded into equity (no period-close yet) so the double-entry invariant holds. End-to-end: contracts type, db fn, `get_balance_sheet` agent tool, `GET /reports/balance-sheet`, and a Books "Balance sheet" subtab. Test asserts it **foots** (Assets = L + E, out-of-balance = 0) and that equity's net income equals the all-time P&L. With `incomeSummary` (P&L), the two core statements now exist — material progress on "replace QuickBooks." 45/45, audit 14/14, eval 11 runnable pass^1 100%. |
 | 2026-06-07 | **~32%** | **~81%** | **BL-025 — model tiering + LLM-judge (playbook steps 7–8 closed, key-independent).** Added `FAST_MODEL` (`claude-haiku-4-5`) and a key-independent `judge()` that grades an answer against a rubric on Haiku (cheaper side-task model; agent stays on Opus 4.8) using structured outputs. Wired the judge into the eval (rubrics on the clinical-no-advice / anti-sycophancy / injection-in-data scenarios; graded after deterministic checks pass, live only). No-key path returns a flagged simulated verdict. 44/44; eval clean. Playbook adoption now **~9.5/10** — only the live pass^k run awaits a key. |
@@ -141,9 +142,9 @@ reality, not priors.
 - **B3 — UI / design-system overhaul** (NORTH_STAR workstream #1; starts after the gate).
 - **B4 — Clinical depth:** form builder + e-sign, richer charting/body charts, AI/predictive notes,
   superbills / insurance-billing **prep** (electronic billing itself is rails/HIPAA-gated).
-- **B5 — Back-office depth:** A/R, A/P + vendors + bill pay, bank reconciliation, financial statements
-  (~~Balance Sheet~~ ✅ BL-026, P&L = `incomeSummary`, Cash Flow pending), period close, payroll **calc**
-  → paystubs → checks → 1099/W-2 prep (ACH + filing rails-gated).
+- **B5 — Back-office depth:** A/R, ~~A/P + vendors~~ ✅ BL-028 (bill-pay ACH rails-gated), bank
+  reconciliation, financial statements (~~Balance Sheet~~ ✅ BL-026, P&L = `incomeSummary`, Cash Flow
+  pending), period close, payroll **calc** → paystubs → checks → 1099/W-2 prep (ACH + filing rails-gated).
 - **B6 — Front-of-house polish:** deposits (Stripe-gated), waitlist, classes, website/branded app,
   reviews/reputation, resources.
 - **B7 — AI CORE / Agentic OS** *(the differentiator; epic — starts right after the gate)*:
@@ -166,6 +167,33 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-028 (2026-06-07) — Accounts Payable: vendors + bills [back-office pillar, B5; accrual GL]
+WHAT: New A/P domain. Schema: `vendors` and `bills` tables (self-healing) + a `2000 Accounts Payable`
+liability in the seeded chart. `packages/db/src/payables.ts`: createVendor/listVendors,
+createBill/listBills/getBill/payBill, payablesSummary. Entering a bill posts **Dr <expense> / Cr A/P**
+and paying posts **Dr A/P / Cr Cash** — each journal entry written ATOMICALLY with the bill row in one
+transaction (a private `postEntry` on the tx client, not a nested `createJournalEntry`). Wired
+end-to-end: `Vendor`/`Bill`/`PayablesSummary` contracts, `routes-payables.ts` (vendors + bills + pay +
+summary; reads `financials.view`, writes `books.manage`), two agent read tools (`payables_summary`,
+`list_unpaid_bills`), and a Books "Bills" subtab (owed summary + open-bill list with Mark-paid + an
+enter-bill form with inline vendor-add). New `payables.test.ts` (6 tests) asserts A/P accrues on entry
+and clears on payment, the trial balance stays balanced throughout, A/P reconciles to the Balance
+Sheet's 2000 line, and double-pay / non-expense-account are rejected. Eval: `sel-unpaid-bills`.
+WHY/HOW: User delegated the pick ("you pick — keep going"); A/P was the biggest QuickBooks-replacement
+pillar missing entirely (no vendor/bill model existed) and it reconciles cleanly into the financial
+statements just shipped (A/P as a Balance-Sheet liability, the bill's expense in the P&L on an accrual
+basis). Rail-free: recording bills and marking them paid is bookkeeping; actual ACH bill-pay is
+B-RAILS. Reused the exact GL primitives (journal_entries/journal_lines, account-by-code lookup) and the
+`books.manage`/`financials.view` gates the human ledger already uses.
+BOUNDARY: One expense account per bill (multi-line bills deferred — fine for a small wellness business's
+single-category bills like rent/supplies). No void/edit of a posted bill yet, no partial payments, no
+A/P aging buckets (payablesSummary gives open + overdue totals; full aging is a follow-up). No agent
+WRITE tools for A/P yet (humans enter/pay bills in the UI; the agent reports via the two read tools) —
+`create_bill`/`pay_bill` as approval-gated tools w/ previews is a clean follow-up. Bill-pay credits Cash
+directly (assumes immediate payment); a "pay from bank account X" selection awaits multi-cash-account
+support. Date granularity is UTC-day (consistent with the other reports).
+GATES: typecheck PASS, build PASS, test 51/51 PASS, audit 14/14 screens 0 axe, eval 12 runnable pass^1 100%.
 
 ### BL-027 (2026-06-07) — P&L gross-profit split [completes the core statements trio]
 WHAT: Upgraded `incomeSummary` to a proper P&L. Added three ADDITIVE fields to `IncomeSummary` —
