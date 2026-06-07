@@ -14,7 +14,8 @@
     "paths": {
       "@prodigy/contracts": ["packages/contracts/src/index.ts"],
       "@prodigy/db": ["packages/db/src/index.ts"],
-      "@prodigy/ai": ["packages/ai/src/index.ts"]
+      "@prodigy/ai": ["packages/ai/src/index.ts"],
+      "@prodigy/agent": ["packages/agent/src/index.ts"]
     }
   }
 }

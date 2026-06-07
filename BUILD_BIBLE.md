@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~19%** | **~50%** | **BL-005 — Agentic-OS runtime: audited, RBAC-gated tool registry.** `@prodigy/agent` — typed tools wrapping the real db modules (books/POS/gift cards/CRM), `executeTool` choke point enforcing server-side RBAC → input validation → **pre-execution approval gate** (money/clinical/outward pause for human sign-off) → execute → tamper-evident audit. `/api/ai/tools` exposes the catalog with per-actor `allowed`. 8 runtime tests green (20/20 total). Next: the LLM-driven agent loop (tool-use) over this registry. |
 | 2026-06-07 | **~18%** | **~46%** | **BL-004 — AI core foundation, step 1: provider seam.** `@prodigy/ai` (AiProvider interface + deterministic SimulatedAiProvider + ClaudeAiProvider behind one factory, model `claude-opus-4-8`); `/api/ai/status` surfaces live-vs-simulated; 5 seam tests green. The Agentic OS can now be built+tested with no key (P11). Next: agent runtime + audited tool registry. Research: modelled the agent surface on Zenoti's 9-agent "AI Workforce" + Mangomint Flows. |
 | 2026-06-07 | **~17%** | **~43%** | **BL-003 — reproducible gate landed.** Committed live-DB test harness (ephemeral Postgres, 7/7 money-path tests green), type-gated test code, GitHub Actions CI (typecheck+build+test), and an inert live-audit harness scaffold. B1 done. Small bump: the foundation is now verifiable + CI-guarded (de-risks everything downstream), but no user-facing feature shipped. Next: AI core foundation. |
 | 2026-06-07 | **~16%** | **~40%** | **Re-baseline (scope expanded, P6):** vision is now a *maximalist, end-to-end, Agentic-OS* platform — absorb every feature the wellness niche wants AND lead with an agentic AI layer (orchestrator + domain agents). The denominator grew a lot, so both % drop honestly even though no code regressed. The 20 shipped slices are unchanged; what's now "100%" is much bigger (full feature absorption + the whole agent system + UI overhaul + back-office/clinical depth). |
@@ -131,6 +132,28 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-005 (2026-06-07) — Agentic-OS runtime: audited, permission-scoped tool registry [the agent's security backbone]
+WHAT: New `@prodigy/agent` package — `AgentTool` registry (6 initial tools spanning books, POS, gift
+cards, CRM: `get_trial_balance`, `list_accounts`, `list_recent_sales`, `list_gift_cards` [auto/read];
+`create_client`, `issue_gift_card` [approval/write]), an `AgentActor` carrying the human's resolved
+RBAC permission set, and `executeTool()` — the single choke point: tool-exists → server-side RBAC
+(owner⇒all, same keys as humans) → input validation → **pre-execution approval gate** → execute via
+the existing db function → tamper-evident audit of every branch. `toolDefinitions(actor)` returns the
+catalog with a per-actor `allowed` flag; `/api/ai/tools` exposes it. 8 live tests (now 20/20).
+WHY/HOW: Web research (HITL approval patterns — sitepoint/redis/dzone) converged on a hard rule:
+**approval must gate BEFORE side effects**, 100% of high-risk actions require it, low-risk auto-runs
+under RBAC. So write tools (money/data) return `requires_approval` and DO NOT run until `{approved:true}`;
+reads auto-run. Tools call the SAME db functions the UI does (P7/P9 — one money path, one permission
+catalog, no parallel source of truth). Audit reuses the existing per-tenant hash chain (resourceType
+`agent_tool`) so agent activity is on the same tamper-evident trail as clinical access — additive, no
+schema change (P8). Fixed a tsconfig `rootDir` issue (importing @prodigy/db source put files outside
+the agent package's rootDir → TS6059; dropped rootDir since the package is noEmit).
+BOUNDARY: No LLM loop yet — `executeTool` is driven directly (and by tests), not yet by the model;
+the tool-use agent loop over this registry is the next increment. Approvals return a `requires_approval`
+envelope but there's no persisted approval queue/UI yet (the caller decides). Audit `detail` includes
+serialized input (lives in the gated, sensitive audit log). Tool set is an initial slice, not full coverage.
+GATES: typecheck PASS, build PASS, test 20/20 PASS (7 money + 5 AI + 8 agent).
 
 ### BL-004 (2026-06-07) — AI core foundation #1: the provider seam [the Agentic-OS differentiator begins]
 WHAT: New `@prodigy/ai` workspace package — `AiProvider` interface + types (`provider.ts`), a
