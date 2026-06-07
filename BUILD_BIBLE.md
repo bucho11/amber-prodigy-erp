@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~21%** | **~58%** | **BL-007 — durable approval queue (human-in-the-loop complete).** New `agent_approvals` table + `@prodigy/db` persistence + `@prodigy/agent` workflow (request → list pending → approve/reject). Approve executes once under the approver's RBAC through `executeTool` (validated, real db path, audited); pending-guarded against double-execute. `/api/ai/agent` now persists proposed writes; `GET/POST /api/ai/approvals[/:id/approve|reject]`. 5 tests green (30/30). The agentic propose→approve→execute→audit loop is end-to-end. Next: the conversational UI surface + approvals inbox. |
 | 2026-06-07 | **~20%** | **~55%** | **BL-006 — the LLM agent loop (the differentiator runs).** Extended the provider seam for tool-use (text/tool_use/tool_result blocks; SimulatedAiProvider emits deterministic tool calls). New `runAgent` orchestrator: manual tool-use loop over the registry with research-backed guardrails — hard step cap + early-stopping synthesis, repeat-call detector, approval pauses. `POST /api/ai/agent` runs it (simulated until a key drops). 5 loop tests green (25/25). The Agentic OS now *operates*, end to end, with no key. Next: a persisted approval queue + the conversational UI surface. |
 | 2026-06-07 | **~19%** | **~50%** | **BL-005 — Agentic-OS runtime: audited, RBAC-gated tool registry.** `@prodigy/agent` — typed tools wrapping the real db modules (books/POS/gift cards/CRM), `executeTool` choke point enforcing server-side RBAC → input validation → **pre-execution approval gate** (money/clinical/outward pause for human sign-off) → execute → tamper-evident audit. `/api/ai/tools` exposes the catalog with per-actor `allowed`. 8 runtime tests green (20/20 total). Next: the LLM-driven agent loop (tool-use) over this registry. |
 | 2026-06-07 | **~18%** | **~46%** | **BL-004 — AI core foundation, step 1: provider seam.** `@prodigy/ai` (AiProvider interface + deterministic SimulatedAiProvider + ClaudeAiProvider behind one factory, model `claude-opus-4-8`); `/api/ai/status` surfaces live-vs-simulated; 5 seam tests green. The Agentic OS can now be built+tested with no key (P11). Next: agent runtime + audited tool registry. Research: modelled the agent surface on Zenoti's 9-agent "AI Workforce" + Mangomint Flows. |
@@ -133,6 +134,25 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-007 (2026-06-07) — Durable approval queue: human-in-the-loop, end to end [governance for autonomous actions]
+WHAT: New `agent_approvals` table (idempotent schema) + `@prodigy/db/approvals.ts` persistence
+(`createAgentApproval` / `listAgentApprovals` / `getAgentApproval` / pending-guarded `decideAgentApproval`)
++ `@prodigy/agent/approvals.ts` workflow (`requestApproval`, `listPendingApprovals`, `decideApproval`).
+`/api/ai/agent` now persists any proposed-but-unapproved actions; added `GET /api/ai/approvals` and
+`POST /api/ai/approvals/:id/{approve,reject}`. 5 live tests (now 30/30).
+WHY/HOW: BL-005/006 surfaced approvals in-memory; this makes them durable so a human can decide them
+out-of-band (the realistic HITL flow). On approve, the action runs under the APPROVER's authority —
+they must hold the tool's permission — and goes through the same `executeTool` choke point (validated →
+real db path → audited), so there's exactly one money/permission/audit path whether a human or an agent
+initiates (P7/P9). The DB UPDATE is `WHERE status='pending'`, so a decided approval can never
+double-execute (verified). Reject closes with no side effect; a denied approve leaves it pending.
+BOUNDARY: No conversational UI / approvals-inbox screen yet (API only — that's the next increment).
+The new API endpoints are wired + typecheck + build but not yet covered by automated HTTP tests (the
+workflow + persistence are fully unit-tested at the package level; HTTP-level coverage waits on the
+live-audit harness). `requested_by`/`decided_by` are stored without a users FK (survive user deletion);
+they're audit metadata, not joins.
+GATES: typecheck PASS, build PASS, test 30/30 PASS (7 money + 5 AI + 8 agent + 5 loop + 5 approvals).
 
 ### BL-006 (2026-06-07) — The LLM-driven agent loop over the registry [the Agentic OS now operates]
 WHAT: Extended the AI provider seam for tool-use — `AiToolSpec`/`AiToolCall` + text/tool_use/tool_result

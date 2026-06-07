@@ -1,6 +1,13 @@
 import type { Request, Router } from "express";
 import { aiStatus, createAiProvider } from "@prodigy/ai";
-import { toolDefinitions, runAgent, type AgentActor } from "@prodigy/agent";
+import {
+  toolDefinitions,
+  runAgent,
+  requestApproval,
+  listPendingApprovals,
+  decideApproval,
+  type AgentActor,
+} from "@prodigy/agent";
 import { reqString, wrap } from "./http";
 import { requireAuth, userOf } from "./security";
 
@@ -47,8 +54,55 @@ export function registerAiRoutes(api: Router): void {
     requireAuth,
     wrap(async (req, res) => {
       const message = reqString(req.body?.message, "message");
-      const run = await runAgent(createAiProvider(), actorOf(req), message);
+      const actor = actorOf(req);
+      const run = await runAgent(createAiProvider(), actor, message);
+      // Persist any proposed-but-unapproved actions so a human can decide them durably.
+      if (run.status === "needs_approval") {
+        const approvals = [];
+        for (const p of run.pending) approvals.push(await requestApproval(actor, p.tool, p.input));
+        res.json({ ...run, approvals });
+        return;
+      }
       res.json(run);
+    })
+  );
+
+  // The human-in-the-loop approval queue.
+  api.get(
+    "/ai/approvals",
+    requireAuth,
+    wrap(async (req, res) => {
+      res.json({ approvals: await listPendingApprovals(actorOf(req).tenantId) });
+    })
+  );
+
+  api.post(
+    "/ai/approvals/:id/approve",
+    requireAuth,
+    wrap(async (req, res) => {
+      const outcome = await decideApproval(actorOf(req), req.params.id, "approve");
+      if (outcome.status === "not_found") {
+        res.status(404).json({ error: "Approval not found." });
+        return;
+      }
+      if (outcome.status === "denied") {
+        res.status(403).json({ error: outcome.reason });
+        return;
+      }
+      res.json(outcome);
+    })
+  );
+
+  api.post(
+    "/ai/approvals/:id/reject",
+    requireAuth,
+    wrap(async (req, res) => {
+      const outcome = await decideApproval(actorOf(req), req.params.id, "reject");
+      if (outcome.status === "not_found") {
+        res.status(404).json({ error: "Approval not found." });
+        return;
+      }
+      res.json(outcome);
     })
   );
 }

@@ -611,6 +611,22 @@ async function applySchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_audit_log ON audit_log(tenant_id, id);
     CREATE INDEX IF NOT EXISTS idx_audit_log_client ON audit_log(tenant_id, client_id);
+
+    -- Agentic-OS approval queue: a durable record of agent-proposed actions awaiting human sign-off.
+    CREATE TABLE IF NOT EXISTS agent_approvals (
+      id           BIGSERIAL PRIMARY KEY,
+      tenant_id    BIGINT NOT NULL REFERENCES tenants(id),
+      requested_by BIGINT,            -- the user the agent acted for (no FK; survives user deletion)
+      actor_name   TEXT NOT NULL,
+      tool         TEXT NOT NULL,
+      input_json   TEXT NOT NULL,      -- the validated tool input, as JSON
+      status       TEXT NOT NULL DEFAULT 'pending',  -- pending | executed | rejected | failed
+      result_json  TEXT,              -- execution outcome, as JSON
+      decided_by   BIGINT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      decided_at   TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_approvals ON agent_approvals(tenant_id, status, id DESC);
   `);
 }
 
@@ -786,3 +802,4 @@ export * from "./reports";
 export * from "./memberships";
 export * from "./booking";
 export * from "./audit";
+export * from "./approvals";
