@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~30%** | **~78%** | **BL-022 — pass^k reliability eval framework (the crown jewel).** Rebuilt `npm run eval` into the playbook's shape: 18 scenarios by FAILURE MODE (TOOL_SELECTION, CONFIRM_ACTIONS, SCOPE, HALLUCINATION, EMPTY_DATA, INJECTION, ANTI_SYCOPHANCY, RECONCILIATION), deterministic checks (expectTools/forbidTools/mustContain/mustNotContain/noUnapprovedWrite), **K-run repeats → pass@1 + pass^k + 95% Wilson CI + per-category**. Simulated baseline: 10 runnable scenarios **pass^1 100%** (incl. CONFIRM_ACTIONS proving no write auto-executes); 8 safety scenarios **pending a live key**. Ready to fire the full suite the instant `ANTHROPIC_API_KEY` is set. |
 | 2026-06-07 | **~29%** | **~77%** | **BL-021 — behavioral constitution (reliability playbook, arc start).** Adopted `AGENTIC_AI_PLAYBOOK.md`'s "reliability is the product" thesis. Put a 12-rule **non-negotiable constitution** at the top of the agent system prompt, adapted to wellness/clinical + grounded in 2026 wellness-AI rules (CA AB 489): tools-first, no-guessing, label-the-source, empty-means-say-so, **no medical advice / not a clinician**, recommendations-are-analysis, confirm-high-stakes-**even-under-pressure**, **reconcile-don't-over-certify**, anti-sycophancy, hard-scope. Exported + regression-guarded (rules can't be silently dropped). 40/40. |
 | 2026-06-07 | **~28%** | **~76%** | **BL-020 — agent context quality (context engineering).** Tool results now return concise, human-readable summaries (e.g. "Sales …: 12 paid orders, net sales $X…") instead of raw JSON with internal IDs — token-efficient context (Anthropic: token usage drives ~80% of agent performance). Enriched the agent system prompt (use real data, one tool/step, never claim un-approved writes ran), and wired **adaptive thinking + effort:high** on the live Claude path (recommended for agentic work). 39/39 tests, eval 15/15. |
 | 2026-06-07 | **~27%** | **~75%** | **BL-019 — agent EVAL harness (evaluation-driven development).** Per Anthropic's agent guidance ("measure tool use, spot failures, iterate") + the eval literature (tool-selection accuracy is the core metric): added heuristic intent→tool routing to the simulated provider (smarter keyless demo + a deterministic stand-in for the model), and `scripts/eval/eval.ts` (`npm run eval`) scoring tool-selection across 15 realistic scenarios. **Baseline: 15/15 = 100%** (confirms tool names are discriminative); runs against live Claude when a key is set (the true measure). Metric B crossed 75%. |
@@ -160,6 +161,30 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-022 (2026-06-07) — pass^k reliability eval framework [the crown jewel; reliability is the product]
+WHAT: Rebuilt `scripts/eval/eval.ts` (`npm run eval`) into the playbook's §4 harness: 18 scenarios
+organized by FAILURE MODE (TOOL_SELECTION, CONFIRM_ACTIONS, SCOPE, HALLUCINATION, EMPTY_DATA, INJECTION,
+ANTI_SYCOPHANCY, RECONCILIATION), each with declarative deterministic checks (`expectTools`,
+`expectToolsAny`, `forbidTools` incl. `"*"`, `mustContain`, `mustNotContain`, `noUnapprovedWrite`). Runs
+each scenario K times and reports **pass@1 + pass^k** (succeeded on ALL k) + **95% Wilson CI** +
+per-category breakdown. Scenarios needing real reasoning are tagged `live` and skipped against the
+simulated heuristic (reported as "pending live key"). Simulated baseline: **10 runnable scenarios pass^1
+100%**, 8 safety pending; the CONFIRM_ACTIONS category structurally verifies no approval-risk tool
+auto-executes (the playbook's top defense, now a measured property).
+WHY/HOW: The playbook's thesis — pass^k, not pass@1, is what the user experiences over a week. This is
+"framework now, key later" (Q1): the harness, categories, Wilson CI, and judge plumbing are complete and
+validated against the deterministic provider; the safety crown jewels (refuse-medical-advice,
+no-hallucination, injection-as-data, anti-sycophancy, reconcile) fire against live Claude with one env
+var. `EVAL_K` overrides K (default 1 simulated / 3 live). Wilson chosen over the normal approximation
+(correct at small n / extreme p — exactly an agent eval's regime).
+BOUNDARY: Against the simulated heuristic only TOOL_SELECTION + CONFIRM_ACTIONS are meaningful (it can't
+reason/refuse), so the headline safety numbers are UNMEASURED until a key is set — the harness is proven,
+the agent's live reliability is not yet. LLM-as-judge is scaffolded in the design (different/cheaper
+model, per §4.4) but not yet wired into the scorer (deterministic checks only for now). n=10 gives a wide
+CI [72%, 100%] — expand the scenario set + K with live runs to tighten (the playbook's lesson). Not a
+blocking CI gate (a tracked reliability score, like the audit harness).
+GATES: typecheck PASS, build PASS, test 40/40 PASS, eval runs clean (10 runnable pass^1 100%, 8 pending live).
 
 ### BL-021 (2026-06-07) — Behavioral constitution: the reliability playbook begins [reliability is the product]
 WHAT: Adopted `AGENTIC_AI_PLAYBOOK.md` (kickoff ritual; decisions in §0.3). Added a 12-rule
