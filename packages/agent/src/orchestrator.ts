@@ -1,6 +1,6 @@
 import type { AiProvider, AiMessage, AiContentBlock, AiToolSpec } from "@prodigy/ai";
 import type { AgentActor } from "./types";
-import { allTools, actorCan } from "./tools";
+import { allTools, actorCan, getTool } from "./tools";
 import { executeTool } from "./execute";
 
 /** One tool invocation the agent made (or attempted) during a run. */
@@ -22,12 +22,20 @@ export interface RunAgentOptions {
   autoApprove?: boolean;
 }
 
-const SYSTEM_PROMPT =
-  "You are the Prodigy operations assistant for a wellness/bodywork business. " +
-  "Answer the user's question using the provided tools when they help. " +
-  "Tools marked as requiring approval (they write data or move money) will pause for a human to " +
-  "approve before they run — propose them when appropriate, but never assume they executed. " +
-  "When you have enough information, give a concise, plain-language answer. Do not invent data.";
+const SYSTEM_PROMPT = [
+  "You are Prodigy, the operations assistant for a wellness/bodywork business (scheduling, clients,",
+  "clinical charting, point-of-sale, and the books). You help the owner and staff get things done.",
+  "",
+  "How to work:",
+  "- Use the provided tools to look things up and to take actions; don't answer from memory when a",
+  "  tool can give the real, current data. Never invent numbers, names, IDs, or outcomes.",
+  "- Prefer ONE well-chosen tool per step. Read the tool result before deciding the next step.",
+  "- Write/financial/clinical tools require human approval: they will PAUSE for sign-off before running.",
+  "  Propose them when appropriate, state plainly that they need approval, and never claim they ran.",
+  "- If you lack an id or detail a tool needs, ask the user for it or look it up first — don't guess.",
+  "- When you have enough to answer, reply concisely in plain language, with the actual figures.",
+  "- Money is in US dollars; be precise. Respect that you act only within the user's permissions.",
+].join("\n");
 
 /** Deterministic signature of a tool call, to detect the model looping on the same action. */
 function callSignature(name: string, input: unknown): string {
@@ -91,7 +99,10 @@ export async function runAgent(
         pending.push({ tool: tc.name, input: exec.input });
         resultBlocks.push({ type: "tool_result", toolUseId: tc.id, content: "PAUSED — awaiting human approval.", isError: false });
       } else if (exec.status === "ok") {
-        resultBlocks.push({ type: "tool_result", toolUseId: tc.id, content: JSON.stringify(exec.result).slice(0, 6000) });
+        // Prefer a concise, human-readable summary (token-efficient context); fall back to truncated JSON.
+        const summarizer = getTool(tc.name)?.summarize;
+        const content = summarizer ? summarizer(exec.result) : JSON.stringify(exec.result).slice(0, 6000);
+        resultBlocks.push({ type: "tool_result", toolUseId: tc.id, content });
       } else {
         resultBlocks.push({ type: "tool_result", toolUseId: tc.id, content: `Error: ${exec.reason}`, isError: true });
       }

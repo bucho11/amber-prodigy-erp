@@ -37,6 +37,12 @@ export interface AgentTool {
   inputSchema: Record<string, unknown>;
   parse(input: unknown): unknown;
   handler(ctx: AgentToolContext, input: unknown): Promise<unknown>;
+  /**
+   * Optional: turn a raw result into a concise, human-readable summary for the model's context
+   * (Anthropic's tool guidance — return meaningful text, not raw IDs; token-efficient). When absent,
+   * the orchestrator falls back to truncated JSON.
+   */
+  summarize?(result: unknown): string;
 }
 
 /** Safe-to-expose tool shape (no handler) plus whether a given actor may call it. */

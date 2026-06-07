@@ -39,6 +39,10 @@ export class ClaudeAiProvider implements AiProvider {
       model: CLAUDE_MODEL,
       max_tokens: req.maxTokens ?? 16000,
       messages: req.messages.map((m: AiMessage) => ({ role: m.role, content: toSdkContent(m.content) })),
+      // Adaptive thinking + high effort is the recommended setting for agentic/tool-use work (Claude
+      // API guidance). Let Claude decide how much to reason per step; no fixed token budget.
+      thinking: { type: "adaptive" },
+      output_config: { effort: "high" },
     };
     if (req.system) params.system = req.system;
     if (req.tools && req.tools.length > 0) {

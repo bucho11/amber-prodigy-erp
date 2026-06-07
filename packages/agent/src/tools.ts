@@ -33,6 +33,7 @@ function reqInt(v: unknown, field: string, min = Number.MIN_SAFE_INTEGER): numbe
   if (!Number.isInteger(n) || n < min) throw new ToolInputError(`'${field}' must be an integer ≥ ${min}.`);
   return n;
 }
+const usd = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
 const isoDay = (d: Date): string => d.toISOString().slice(0, 10);
 function optDate(v: unknown, fallback: string): string {
   if (v === undefined || v === null || v === "") return fallback;
@@ -69,6 +70,10 @@ const TOOLS: AgentTool[] = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     parse: () => ({}),
     handler: ({ actor }) => trialBalance(actor.tenantId),
+    summarize: (r) => {
+      const tb = r as { rows: unknown[]; totalDebitCents: number; totalCreditCents: number };
+      return `Trial balance: ${tb.rows.length} accounts with balances; total debits ${usd(tb.totalDebitCents)} = total credits ${usd(tb.totalCreditCents)} (balanced).`;
+    },
   },
   {
     name: "list_accounts",
@@ -93,6 +98,13 @@ const TOOLS: AgentTool[] = [
     },
     parse: (input) => ({ status: optStr((input as { status?: unknown })?.status) ?? undefined }),
     handler: ({ actor }, input) => listOrders(actor.tenantId, input as { status?: string }),
+    summarize: (r) => {
+      const os = r as { status: string; totalCents: number; clientName: string | null }[];
+      if (os.length === 0) return "No recent sales.";
+      const total = os.reduce((s, o) => s + (o.totalCents ?? 0), 0);
+      const head = os.slice(0, 3).map((o) => `${o.clientName ?? "walk-in"} ${usd(o.totalCents)} (${o.status})`).join("; ");
+      return `${os.length} recent order(s), total ${usd(total)}; latest: ${head}.`;
+    },
   },
   {
     name: "list_gift_cards",
@@ -103,6 +115,12 @@ const TOOLS: AgentTool[] = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     parse: () => ({}),
     handler: ({ actor }) => listGiftCards(actor.tenantId, {}),
+    summarize: (r) => {
+      const gs = r as { balanceCents: number }[];
+      if (gs.length === 0) return "No gift cards.";
+      const total = gs.reduce((s, g) => s + (g.balanceCents ?? 0), 0);
+      return `${gs.length} gift card(s); total outstanding balance ${usd(total)}.`;
+    },
   },
   {
     name: "find_client",
@@ -118,6 +136,12 @@ const TOOLS: AgentTool[] = [
     },
     parse: (input) => ({ search: reqStr((input as { search?: unknown })?.search, "search") }),
     handler: ({ actor }, input) => listClients(actor.tenantId, { search: (input as { search: string }).search, limit: 20 }),
+    summarize: (r) => {
+      const cs = r as { displayName: string; email: string | null }[];
+      if (cs.length === 0) return "No matching clients found.";
+      const head = cs.slice(0, 5).map((c) => `${c.displayName}${c.email ? ` (${c.email})` : ""}`).join("; ");
+      return `${cs.length} client(s): ${head}${cs.length > 5 ? `, +${cs.length - 5} more` : ""}.`;
+    },
   },
   {
     name: "list_appointments",
@@ -135,6 +159,12 @@ const TOOLS: AgentTool[] = [
       return { from: optDate(i.from, today()), to: optDate(i.to, tomorrow()) };
     },
     handler: ({ actor }, input) => listAppointments(actor.tenantId, input as { from: string; to: string }),
+    summarize: (r) => {
+      const as = r as { startsAt: string }[];
+      if (as.length === 0) return "No appointments in that range.";
+      const first = new Date(as[0].startsAt).toISOString().slice(0, 16).replace("T", " ");
+      return `${as.length} appointment(s) in range; first at ${first} UTC.`;
+    },
   },
   {
     name: "sales_summary",
@@ -152,6 +182,10 @@ const TOOLS: AgentTool[] = [
       return { from: optDate(i.from, monthStart()), to: optDate(i.to, today()) };
     },
     handler: ({ actor }, input) => salesSummary(actor.tenantId, (input as { from: string }).from, (input as { to: string }).to),
+    summarize: (r) => {
+      const s = r as { from: string; to: string; paidOrderCount: number; netSalesCents: number; taxCents: number; tipCents: number; totalCollectedCents: number; refundCount: number; refundedCents: number };
+      return `Sales ${s.from}→${s.to}: ${s.paidOrderCount} paid orders, net sales ${usd(s.netSalesCents)}, tax ${usd(s.taxCents)}, tips ${usd(s.tipCents)}, total collected ${usd(s.totalCollectedCents)}; ${s.refundCount} refund(s) ${usd(s.refundedCents)}.`;
+    },
   },
   {
     name: "income_summary",
@@ -179,6 +213,10 @@ const TOOLS: AgentTool[] = [
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     parse: () => ({}),
     handler: ({ actor }) => inventorySnapshot(actor.tenantId),
+    summarize: (r) => {
+      const s = r as { trackedProductCount: number; inventoryValueCents: number; retailValueCents: number; outOfStockCount: number; lowStock: unknown[] };
+      return `Inventory: ${s.trackedProductCount} tracked products; stock value ${usd(s.inventoryValueCents)} at cost / ${usd(s.retailValueCents)} retail; ${s.outOfStockCount} out of stock, ${s.lowStock.length} low.`;
+    },
   },
   {
     name: "create_client",

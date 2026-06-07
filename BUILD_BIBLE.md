@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~28%** | **~76%** | **BL-020 — agent context quality (context engineering).** Tool results now return concise, human-readable summaries (e.g. "Sales …: 12 paid orders, net sales $X…") instead of raw JSON with internal IDs — token-efficient context (Anthropic: token usage drives ~80% of agent performance). Enriched the agent system prompt (use real data, one tool/step, never claim un-approved writes ran), and wired **adaptive thinking + effort:high** on the live Claude path (recommended for agentic work). 39/39 tests, eval 15/15. |
 | 2026-06-07 | **~27%** | **~75%** | **BL-019 — agent EVAL harness (evaluation-driven development).** Per Anthropic's agent guidance ("measure tool use, spot failures, iterate") + the eval literature (tool-selection accuracy is the core metric): added heuristic intent→tool routing to the simulated provider (smarter keyless demo + a deterministic stand-in for the model), and `scripts/eval/eval.ts` (`npm run eval`) scoring tool-selection across 15 realistic scenarios. **Baseline: 15/15 = 100%** (confirms tool names are discriminative); runs against live Claude when a key is set (the true measure). Metric B crossed 75%. |
 | 2026-06-07 | **~27%** | **~74%** | **BL-018 — audit coverage 4→14 screens; fixed 4 real a11y bugs.** Extended the live-audit harness to click through every authed nav screen (Calendar, Clients, Checkout, Books+Expenses, Inventory, Reports, Memberships, Team, Audit) + capture violation node targets. Surfaced + fixed: unlabeled date/provider selects (Calendar), unlabeled role selects + invite email (Team), low-contrast "Full access" badge — **14/14 screens now 0 axe violations**. 38/38 tests green. |
 | 2026-06-07 | **~26%** | **~73%** | **BL-017 — Expenses UI + API (humans, not just the agent).** `POST /api/expenses` (books.manage) + a one-click "Expenses" subtab/form in Books (pick expense account → amount → memo → date → balanced entry). Completes `recordExpense` across the stack (db→agent→API→UI). 38/38 green. |
@@ -147,6 +148,27 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-020 (2026-06-07) — Agent context quality: tool-result summaries + system prompt + adaptive thinking [context engineering]
+WHAT: (1) Added an optional `summarize(result)` to `AgentTool` and concise formatters to the read tools
+(trial balance, recent sales, gift cards, find client, appointments, sales summary, inventory) — the
+orchestrator now feeds the model a short human-readable line (e.g. "Trial balance: 17 accounts; total
+debits $X = total credits $X (balanced).") instead of raw JSON with internal IDs; falls back to
+truncated JSON for un-summarized tools. (2) Rewrote the agent system prompt: use real tool data (never
+invent), one well-chosen tool per step, read results before deciding, never claim an approval-gated
+write ran, ask for missing ids. (3) Wired `thinking:{type:"adaptive"}` + `output_config:{effort:"high"}`
+on `ClaudeAiProvider` (the recommended agentic setting). Test asserts the summary is a short sentence,
+not raw JSON.
+WHY/HOW: Directly applies the context-engineering research (Anthropic "writing tools for agents" +
+"effective context engineering"): return meaningful, token-efficient context, not raw IDs — token usage
+explains ~80% of agent performance variance. Cleaner context → better reasoning + lower cost on the live
+path. Adaptive thinking + high effort is Claude's recommended config for tool-use/agentic work.
+BOUNDARY: Summaries cover the main read tools; `list_accounts`/`income_summary` still fall back to JSON
+(fine — small/typed). The adaptive-thinking + effort params run only on the live Claude path (untested
+here, no key) and assume the installed SDK accepts them (Anthropic SDK that supports Opus 4.8 surface);
+if an older SDK rejects `output_config.effort`, drop it — the agent still works. System-prompt quality is
+judged on the live model (the simulated heuristic ignores it).
+GATES: typecheck PASS, build PASS, test 39/39 PASS, eval 15/15 (100%).
 
 ### BL-019 (2026-06-07) — Agent evaluation harness: evaluation-driven development [measure the AI to improve it]
 WHAT: (1) Added heuristic intent→tool routing to `SimulatedAiProvider` — scores a prompt's distinctive

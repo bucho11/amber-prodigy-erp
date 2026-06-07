@@ -4,7 +4,7 @@
  * existing db modules, input validation, and a tamper-evident audit trail (P9).
  */
 import { assert, assertEqual, TestRunner } from "../harness";
-import { executeTool, toolDefinitions, type AgentActor } from "@prodigy/agent";
+import { executeTool, toolDefinitions, getTool, type AgentActor } from "@prodigy/agent";
 
 type Db = typeof import("@prodigy/db");
 
@@ -159,6 +159,16 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     assert(ok.status === "ok" && (ok.result as { assessment: string | null }).assessment === "improving", "the note carries the assessment");
     const notes = await db.listSoapNotes(tenantId, c.id);
     assertEqual(notes.length, 1, "exactly one SOAP note persisted to the chart (the pending one never wrote)");
+  });
+
+  await t.test("read results are summarized human-readably (token-efficient context, not raw JSON)", async () => {
+    const tb = await executeTool(owner, "get_trial_balance", {});
+    assert(tb.status === "ok", "trial balance ran");
+    const summarize = getTool("get_trial_balance")?.summarize;
+    assert(summarize, "tool has a summarizer");
+    const summary = summarize!(tb.result);
+    assert(/trial balance/i.test(summary) && summary.includes("="), "summary is concise + human-readable");
+    assert(summary.length < 200 && !summary.trim().startsWith("{"), "summary is a short sentence, not raw JSON");
   });
 
   await t.test("every agent action landed on the tamper-evident audit chain (intact)", async () => {
