@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~29%** | **~77%** | **BL-021 — behavioral constitution (reliability playbook, arc start).** Adopted `AGENTIC_AI_PLAYBOOK.md`'s "reliability is the product" thesis. Put a 12-rule **non-negotiable constitution** at the top of the agent system prompt, adapted to wellness/clinical + grounded in 2026 wellness-AI rules (CA AB 489): tools-first, no-guessing, label-the-source, empty-means-say-so, **no medical advice / not a clinician**, recommendations-are-analysis, confirm-high-stakes-**even-under-pressure**, **reconcile-don't-over-certify**, anti-sycophancy, hard-scope. Exported + regression-guarded (rules can't be silently dropped). 40/40. |
 | 2026-06-07 | **~28%** | **~76%** | **BL-020 — agent context quality (context engineering).** Tool results now return concise, human-readable summaries (e.g. "Sales …: 12 paid orders, net sales $X…") instead of raw JSON with internal IDs — token-efficient context (Anthropic: token usage drives ~80% of agent performance). Enriched the agent system prompt (use real data, one tool/step, never claim un-approved writes ran), and wired **adaptive thinking + effort:high** on the live Claude path (recommended for agentic work). 39/39 tests, eval 15/15. |
 | 2026-06-07 | **~27%** | **~75%** | **BL-019 — agent EVAL harness (evaluation-driven development).** Per Anthropic's agent guidance ("measure tool use, spot failures, iterate") + the eval literature (tool-selection accuracy is the core metric): added heuristic intent→tool routing to the simulated provider (smarter keyless demo + a deterministic stand-in for the model), and `scripts/eval/eval.ts` (`npm run eval`) scoring tool-selection across 15 realistic scenarios. **Baseline: 15/15 = 100%** (confirms tool names are discriminative); runs against live Claude when a key is set (the true measure). Metric B crossed 75%. |
 | 2026-06-07 | **~27%** | **~74%** | **BL-018 — audit coverage 4→14 screens; fixed 4 real a11y bugs.** Extended the live-audit harness to click through every authed nav screen (Calendar, Clients, Checkout, Books+Expenses, Inventory, Reports, Memberships, Team, Audit) + capture violation node targets. Surfaced + fixed: unlabeled date/provider selects (Calendar), unlabeled role selects + invite email (Team), low-contrast "Full access" badge — **14/14 screens now 0 axe violations**. 38/38 tests green. |
@@ -102,6 +103,17 @@ reality, not priors.
   build, including the UI overhaul (which becomes the agentic surface), is designed AI-native around it.
 - **Niche scope:** wedge-deep on **massage/bodywork/wellness-clinical** to 10/10, but **architect
   multi-vertical** (salon/spa/med-spa/fitness) so broadening later is config, not a rebuild.
+- **Agentic-AI reliability playbook (ratified 2026-06-07 — adopted `AGENTIC_AI_PLAYBOOK.md`):** the
+  thesis is **reliability is the product, not capability** (pass^k, not pass@1). Ratified for Prodigy:
+  (a) **reliability-first** priority for the AI arc — our stakes (clinical charts + money) are HIGHER
+  than the playbook's source project, so consistency matters more; (b) build the **pass^k eval
+  framework now, light up live when an `ANTHROPIC_API_KEY` is set** (key-later); (c) action tiers — our
+  writes are already 100% approval-gated, so the high-value add is **simulate-first impact previews** at
+  the approval step (undo is lower priority since nothing auto-executes); (d) **hard scope** (Rule 10 +
+  6, grounded in 2026 wellness-AI rules incl. CA AB 489): the agent **declines medical/clinical advice**
+  (surfaces chart data but never diagnoses/recommends treatment; never implies it's a licensed provider),
+  frames money/legal as **analysis not directives**, and declines anything outside this business's ops.
+  The 12-rule **behavioral constitution** lives at the top of the agent system prompt (BL-021).
 - **Hard constraints (LOCKED, from `NORTH_STAR.md`):** (1) regulated external rails — live card
   processing, SMS/email **sending**, payroll tax filing / ACH — are activated **LAST**, right before
   ship, and only with Bucho's own accounts (build the software around them earlier as inert seams).
@@ -148,6 +160,30 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-021 (2026-06-07) — Behavioral constitution: the reliability playbook begins [reliability is the product]
+WHAT: Adopted `AGENTIC_AI_PLAYBOOK.md` (kickoff ritual; decisions in §0.3). Added a 12-rule
+`AGENT_CONSTITUTION` at the top of the agent system prompt (`orchestrator.ts`), adapted to a
+wellness/clinical operations context: tools-first, no-guessing, label-the-source, empty-means-say-so,
+recommendations-are-analysis (not a CPA/attorney), **NOT A CLINICIAN — no medical advice** (surface
+chart data, never diagnose/recommend treatment, never imply a licensed provider), logged-data-only,
+uncertainty-changes-the-answer, no-fabrication, **hard scope** (decline out-of-domain in character),
+**high-stakes confirmation even under pressure**, **reconcile-don't-over-certify + anti-sycophancy**.
+Exported the constitution and added a regression test asserting every non-negotiable phrase is present.
+WHY/HOW: The playbook's core thesis — consistency > peak capability for a business copilot (τ-bench
+pass^k). Our context raises the stakes vs. the source project (clinical charts + money), so the
+constitution's safety rules matter more, not less. Hard-scope grounded in 2026 wellness-AI guidance
+(strict separation of operations from medical advice; CA AB 489 — don't imply licensed-provider status;
+guardrails in structure, not just prose). Rules 6/10/11/12 are the additions our prior prompt lacked.
+The constitution is a system-prompt change → its behavioral effect is judged on the LIVE model (the
+simulated heuristic ignores prose); the regression test guards the rules' PRESENCE so they can't be
+dropped silently (playbook: "a behavior you can't prove safe becomes a rule, then a regression test").
+BOUNDARY: Behavioral adherence (does the live agent actually refuse medical advice / confirm under
+pressure?) is UNVERIFIED until the pass^k eval runs against live Claude (next: BL-022 framework, then a
+key). Structural separation for hard-stakes is already in code (approval gate + RBAC + tenant scope);
+the constitution reinforces it in language. Reconciliation (Rule 12) is stated but not yet wired as a
+cross-source tool check — that's a follow-up (playbook §5.2).
+GATES: typecheck PASS, build PASS, test 40/40 PASS.
 
 ### BL-020 (2026-06-07) — Agent context quality: tool-result summaries + system prompt + adaptive thinking [context engineering]
 WHAT: (1) Added an optional `summarize(result)` to `AgentTool` and concise formatters to the read tools

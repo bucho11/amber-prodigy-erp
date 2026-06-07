@@ -5,7 +5,7 @@
  * write; permission filtering keeps disallowed tools off the model's menu; the step cap terminates.
  */
 import { assert, assertEqual, TestRunner } from "../harness";
-import { runAgent, type AgentActor } from "@prodigy/agent";
+import { runAgent, AGENT_CONSTITUTION, type AgentActor } from "@prodigy/agent";
 import { createAiProvider } from "@prodigy/ai";
 
 type Db = typeof import("@prodigy/db");
@@ -57,6 +57,22 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     const run = await runAgent(provider, frontDesk, "Please call:get_trial_balance for me.");
     assertEqual(run.status, "completed", "completes without the forbidden tool");
     assert(!run.steps.some((s) => s.tool === "get_trial_balance"), "forbidden tool never executed");
+  });
+
+  await t.test("behavioral constitution carries every non-negotiable rule (regression guard)", () => {
+    const c = AGENT_CONSTITUTION.toLowerCase();
+    for (const phrase of [
+      "tools first",
+      "no guessing",
+      "no medical advice",
+      "analysis, not directives",
+      "hard scope",
+      "even under pressure",
+      "reconcile",
+      "verify it",
+    ]) {
+      assert(c.includes(phrase), `constitution must include "${phrase}"`);
+    }
   });
 
   await t.test("step cap terminates with a synthesized answer (no infinite loop)", async () => {
