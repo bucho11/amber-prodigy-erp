@@ -172,17 +172,35 @@ export function ReportsPage() {
                   <td>Revenue</td>
                   <td className="num">{fmt(income.revenueCents)}</td>
                 </tr>
-                {income.expenses.map((e) => (
-                  <tr key={e.code}>
-                    <td>
-                      <span className="muted small">{e.code}</span> {e.name}
-                    </td>
-                    <td className="num">- {fmt(e.amountCents)}</td>
+                {income.expenses
+                  .filter((e) => e.code.startsWith("5"))
+                  .map((e) => (
+                    <tr key={e.code}>
+                      <td>
+                        <span className="muted small">{e.code}</span> {e.name}
+                      </td>
+                      <td className="num">- {fmt(e.amountCents)}</td>
+                    </tr>
+                  ))}
+                {income.cogsCents > 0 && (
+                  <tr className="total-row">
+                    <td>Gross profit</td>
+                    <td className="num">{fmt(income.grossProfitCents)}</td>
                   </tr>
-                ))}
+                )}
+                {income.expenses
+                  .filter((e) => !e.code.startsWith("5"))
+                  .map((e) => (
+                    <tr key={e.code}>
+                      <td>
+                        <span className="muted small">{e.code}</span> {e.name}
+                      </td>
+                      <td className="num">- {fmt(e.amountCents)}</td>
+                    </tr>
+                  ))}
                 <tr className="total-row">
-                  <td>Expenses</td>
-                  <td className="num">- {fmt(income.expenseCents)}</td>
+                  <td>{income.cogsCents > 0 ? "Operating expenses" : "Expenses"}</td>
+                  <td className="num">- {fmt(income.cogsCents > 0 ? income.operatingExpenseCents : income.expenseCents)}</td>
                 </tr>
               </tbody>
               <tfoot>

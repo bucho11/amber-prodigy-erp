@@ -239,5 +239,9 @@ export async function run(db: Db, t: TestRunner): Promise<void> {
     const inc = await db.incomeSummary(tenantId, "2000-01-01", asOf);
     assertEqual(bs.netIncomeToDateCents, inc.netIncomeCents, "equity's net income matches the P&L");
     assert(bs.totalAssetsCents > 0, "the sheet has real activity (assets posted from sales)");
+    // P&L sub-totals reconcile: gross profit = revenue − COGS; COGS + opex = total expenses.
+    assertEqual(inc.grossProfitCents, inc.revenueCents - inc.cogsCents, "gross profit = revenue − COGS");
+    assertEqual(inc.cogsCents + inc.operatingExpenseCents, inc.expenseCents, "COGS + opex = total expenses");
+    assertEqual(inc.netIncomeCents, inc.grossProfitCents - inc.operatingExpenseCents, "net income = gross profit − opex");
   });
 }

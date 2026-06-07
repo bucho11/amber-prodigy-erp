@@ -629,7 +629,10 @@ export interface IncomeSummary {
   from: string;
   to: string;
   revenueCents: number;
-  expenseCents: number;
+  cogsCents: number;            // cost of goods sold (account codes 5xxx)
+  grossProfitCents: number;     // revenue − COGS
+  operatingExpenseCents: number; // expenses excluding COGS
+  expenseCents: number;         // all expenses incl. COGS
   netIncomeCents: number;
   revenue: IncomeLine[];
   expenses: IncomeLine[];

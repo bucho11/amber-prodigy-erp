@@ -67,6 +67,7 @@ export async function incomeSummary(tenantId: string, from: string, to: string):
   const expenses: IncomeLine[] = [];
   let revenueCents = 0;
   let expenseCents = 0;
+  let cogsCents = 0;
   for (const r of rows) {
     if (r.type === "revenue") {
       const amt = n(r.c) - n(r.d); // revenue is a credit balance
@@ -76,9 +77,21 @@ export async function incomeSummary(tenantId: string, from: string, to: string):
       const amt = n(r.d) - n(r.c); // expense is a debit balance
       if (amt !== 0) expenses.push({ code: r.code, name: r.name, amountCents: amt });
       expenseCents += amt;
+      if (r.code.startsWith("5")) cogsCents += amt; // COGS accounts are coded 5xxx
     }
   }
-  return { from, to, revenueCents, expenseCents, netIncomeCents: revenueCents - expenseCents, revenue, expenses };
+  return {
+    from,
+    to,
+    revenueCents,
+    cogsCents,
+    grossProfitCents: revenueCents - cogsCents,
+    operatingExpenseCents: expenseCents - cogsCents,
+    expenseCents,
+    netIncomeCents: revenueCents - expenseCents,
+    revenue,
+    expenses,
+  };
 }
 
 /**

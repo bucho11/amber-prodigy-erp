@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~33%** | **~83%** | **BL-027 — P&L upgraded to show Gross Profit (COGS → Gross Profit → Operating Expenses → Net Income).** Additive fields on `IncomeSummary` (`cogsCents`/`grossProfitCents`/`operatingExpenseCents`) derived from the 5xxx COGS account coding; Reports income statement now splits COGS from operating expenses and shows gross profit. Test asserts the sub-totals reconcile. Completes the core financial-statements trio (P&L + Balance Sheet). 45/45. |
 | 2026-06-07 | **~33%** | **~82%** | **BL-026 — Balance Sheet (the missing core financial statement).** Built `balanceSheet(tenantId, asOf)` from the GL — assets/liabilities/equity as of a date, with net-income-to-date folded into equity (no period-close yet) so the double-entry invariant holds. End-to-end: contracts type, db fn, `get_balance_sheet` agent tool, `GET /reports/balance-sheet`, and a Books "Balance sheet" subtab. Test asserts it **foots** (Assets = L + E, out-of-balance = 0) and that equity's net income equals the all-time P&L. With `incomeSummary` (P&L), the two core statements now exist — material progress on "replace QuickBooks." 45/45, audit 14/14, eval 11 runnable pass^1 100%. |
 | 2026-06-07 | **~32%** | **~81%** | **BL-025 — model tiering + LLM-judge (playbook steps 7–8 closed, key-independent).** Added `FAST_MODEL` (`claude-haiku-4-5`) and a key-independent `judge()` that grades an answer against a rubric on Haiku (cheaper side-task model; agent stays on Opus 4.8) using structured outputs. Wired the judge into the eval (rubrics on the clinical-no-advice / anti-sycophancy / injection-in-data scenarios; graded after deterministic checks pass, live only). No-key path returns a flagged simulated verdict. 44/44; eval clean. Playbook adoption now **~9.5/10** — only the live pass^k run awaits a key. |
 | 2026-06-07 | **~31%** | **~80%** | **BL-024 — simulate-first impact previews on approvals (action tier).** Added `preview(input)` to every write tool + `approvalPreview()`; the approval inbox + history now show plain-language impact ("Issue a $50.00 gift card", "Record a $40.00 expense to 6000 — towels") instead of raw input JSON — the "describe the impact before you confirm" pattern (Rule 11). 42/42 tests, audit 14/14 clean. **Metric B reached 80%.** |
@@ -165,6 +166,25 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-027 (2026-06-07) — P&L gross-profit split [completes the core statements trio]
+WHAT: Upgraded `incomeSummary` to a proper P&L. Added three ADDITIVE fields to `IncomeSummary` —
+`cogsCents` (sum of expense lines coded 5xxx), `grossProfitCents` (revenue − COGS), and
+`operatingExpenseCents` (expenses − COGS) — leaving `expenseCents`/`netIncomeCents` unchanged so no
+consumer breaks. The Reports income statement now renders COGS → **Gross profit** → Operating expenses
+→ Net income (gross-profit line only shown when COGS > 0). Money-suite test asserts the sub-totals
+reconcile (gross profit = revenue − COGS; COGS + opex = total expenses; net = gross − opex).
+WHY/HOW: The matched companion to BL-026's Balance Sheet — with both, Prodigy now has the two core
+financial statements a real bookkeeping product needs. The chart of accounts already separates COGS
+(5xxx) from operating expenses (6xxx), so gross profit/margin falls out cleanly. Kept the change purely
+additive (new fields + a UI re-layout) rather than reshaping `IncomeSummary`, so the agent's
+`income_summary` tool, Books, and existing tests are untouched.
+BOUNDARY: COGS detection is by code-prefix convention (5xxx) — correct for the seeded chart and the
+`record_expense`/`postOrderCOGS` paths, but a custom expense account miscoded outside 5xxx would land in
+opex (acceptable; the chart is curated). No gross-margin % shown yet, no multi-period comparison. Reports
+page isn't in the live-audit covered set, so axe count is unchanged from BL-026 (login/dashboard/
+assistant/public-booking).
+GATES: typecheck PASS, build PASS, test 45/45 PASS.
 
 ### BL-026 (2026-06-07) — Balance Sheet: the missing core financial statement [back-office breadth, B5]
 WHAT: Added `balanceSheet(tenantId, asOf)` (`packages/db/src/reports.ts`) — assets/liabilities/equity
