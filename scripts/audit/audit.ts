@@ -148,7 +148,7 @@ async function main(): Promise<void> {
         return false;
       }, text);
 
-    const navScreens = ["Assistant", "Calendar", "Waitlist", "Clients", "Checkout", "Books", "Inventory", "Reports", "Memberships", "Team & Roles", "Audit"];
+    const navScreens = ["Assistant", "Calendar", "Waitlist", "Classes", "Clients", "Checkout", "Books", "Inventory", "Reports", "Memberships", "Team & Roles", "Audit"];
     let n = 3;
     const num = (): string => String(n).padStart(2, "0");
     const slugify = (s: string): string => s.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");

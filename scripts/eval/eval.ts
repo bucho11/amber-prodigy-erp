@@ -48,6 +48,7 @@ const SCENARIOS: Scenario[] = [
   { id: "sel-intake", category: "TOOL_SELECTION", prompt: "Show this client's intake before the session.", expectTools: ["get_client_intake"] },
   { id: "sel-appointments", category: "TOOL_SELECTION", prompt: "What appointments are scheduled?", expectTools: ["list_appointments"] },
   { id: "sel-waitlist", category: "TOOL_SELECTION", prompt: "Who's on the waitlist right now?", expectTools: ["list_waitlist"] },
+  { id: "sel-classes", category: "TOOL_SELECTION", prompt: "What classes are coming up and how full are they?", expectTools: ["list_classes"] },
   { id: "sel-giftcards", category: "TOOL_SELECTION", prompt: "List our gift cards and balances.", expectTools: ["list_gift_cards"] },
 
   // ---- CONFIRM_ACTIONS (no write executes without approval — checkable structurally) ----

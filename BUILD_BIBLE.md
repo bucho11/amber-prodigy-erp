@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~41%** | **~90%** | **BL-036 — Group classes (capacity + roster + attendance).** New `class_sessions` + `class_enrollments` domain: `classes.ts` db (create/list/roster/enroll/attendance), capacity-enforced enrollment (full → "add to waitlist", tying to BL-035), `ClassSession`/`ClassRosterEntry` contracts, `routes-classes.ts`, `list_classes` + approval-gated `enroll_in_class` agent tools, and a **Classes** nav page (schedule a class → roster with enroll/attended/no-show/remove). `classes.test.ts` (7: capacity enforced, never enrolls past capacity, cancel frees a spot, idempotent re-enroll, attendance, agent-gated). 72/72, audit 21/21, eval 18 pass^1 100%. Research-grounded (Glofox/Wellyx/Mindbody: capacity, roster attendance, waitlist-when-full). |
 | 2026-06-07 | **~40%** | **~89%** | **BL-035 — Waitlist (front-of-house, B6) + sharper tool-router.** New `waitlist` domain: table, `waitlist.ts` db (add/list/status, joins client+service+provider names), `routes-waitlist.ts` (scheduling.view/manage), `list_waitlist` + approval-gated `add_to_waitlist` agent tools, a new **Waitlist** nav page (client search picker, add form, placed/remove actions), and `waitlist.test.ts` (6: add/list/status/invalid/unknown-client/agent-gated/tenant-isolation). Also fixed the simulated tool-router to weight EXACT token matches over substring (so "waitlist" stops tying every `list_*` tool). 65/65, audit 20/20, eval 17 pass^1 100%. Research-grounded (GlossGenius/Wellyx: client+service+window fields, fill-cancellations). |
 | 2026-06-07 | **~39%** | **~89%** | **BL-034 — clinical read tools for the agent (surface the chart, don't diagnose).** The agent could WRITE a SOAP note but couldn't READ the chart. Added `get_client_intake` + `list_soap_notes` (clinical.view-gated) that surface RECORDED health history (allergies, conditions, meds, injuries, areas to avoid, consent) — explicitly "recorded info, not medical advice; does not assess contraindications" (constitution Rule 6 made concrete; grounded in 2026 wellness-AI scope research). Test: surfaces recorded allergies/areas-to-avoid, front-desk denied (no clinical.view). 59/59, eval 16 pass^1 100%. Brings the clinical wedge into the Agentic OS, read-side. |
 | 2026-06-07 | **~38%** | **~88%** | **BL-033 — extend the live-audit to the financial UIs (raise the bar on what was built).** The audit covered Books' default + Expenses subtabs only, so the new Balance sheet / Bills / Reconcile UIs (BL-026/028/032) had no a11y coverage. Generalized the harness to capture every Books subtab → **19 screens (up from 14), all 0 axe violations.** Consolidation, not a feature: durable a11y coverage for the back-office surface I just shipped. |
@@ -156,7 +157,8 @@ reality, not priors.
   ~~financial statements~~ ✅ **big-3 done** (Balance Sheet BL-026, P&L BL-027, Cash Flow BL-031), period
   close, cash-basis reporting toggle, payroll **calc** → paystubs → checks → 1099/W-2 prep (rails-gated).
 - **B6 — Front-of-house polish:** deposits (Stripe-gated), ~~waitlist~~ ✅ BL-035 (auto-notify needs
-  comms rail), classes, website/branded app, reviews/reputation, resources.
+  comms rail), ~~classes~~ ✅ BL-036 (capacity + roster + attendance; full→waitlist), website/branded
+  app, reviews/reputation, resources.
 - **B7 — AI CORE / Agentic OS** *(the differentiator; epic — starts right after the gate)*:
   (a) **provider seam** — `AiProvider` interface + deterministic `SimulatedAiProvider` (no key) +
   `ClaudeAiProvider` (Anthropic, latest models) behind one factory; (b) **agent runtime** — an
@@ -177,6 +179,31 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-036 (2026-06-07) — Group classes: capacity + roster + attendance [front-of-house, B6]
+WHAT: New group-class domain end-to-end. Schema: `class_sessions` (name, provider, room, start/end,
+capacity, status) + `class_enrollments` (client, status enrolled/cancelled/attended/no_show, UNIQUE per
+client per class). `packages/db/src/classes.ts`: create/list (upcoming, with enrolled count + spots
+left)/getRoster/enrollClient (CAPACITY-ENFORCED — a full class throws "add to the waitlist instead";
+idempotent on re-enroll)/setEnrollmentStatus. `ClassSession`/`ClassRosterEntry` contracts,
+`routes-classes.ts` (classes + roster + enroll + enrollment status; `scheduling.view`/`manage`),
+`list_classes` (read) + approval-gated `enroll_in_class` (write, preview) agent tools, and a **Classes**
+nav page (schedule a class; open a class → roster with a client-search enroll picker + attended/no-show/
+remove actions; "full → use the waitlist" hint). `classes.test.ts` (7 tests) proves the capacity
+invariant: enroll up to capacity, reject past it, cancel frees a spot for the next client, re-enroll is
+idempotent (no double count), attendance marking, invalid status rejected, agent enroll approval-gated.
+WHY/HOW: User said continue + research. Researched group-class scheduling (Glofox, Wellyx, Mindbody):
+capacity limits + roster-based attendance + waitlist-when-full are the core; selling via drop-in/pack/
+membership and auto-fill-from-waitlist are the extensions. Built the capacity+roster+attendance core and
+wired the full→waitlist boundary (ties to BL-035). Reused the scheduling gates, the approval/preview
+infra, and the client-search picker pattern. Added Classes to the live-audit (21 screens, 0 axe).
+BOUNDARY: No payment tie-in yet — enrolling doesn't charge/decrement a class pack or membership (drop-in
+billing is a follow-up; today enroll = roster seat, pay via Checkout separately). No recurring-class
+generation (each session created individually) and no auto-move from waitlist into a freed seat (needs a
+comms rail). Class create UI collects name/time/capacity; provider/room are nullable and API-settable but
+not yet pickable in the form. Times sent as ISO from the browser's local datetime. Per-role audit still
+owner-only.
+GATES: typecheck PASS, build PASS, test 72/72 PASS, audit 21/21 screens 0 axe, eval 18 runnable pass^1 100%.
 
 ### BL-035 (2026-06-07) — Waitlist [front-of-house breadth, B6] + exact-match tool-router fix
 WHAT: New front-of-house `waitlist` domain end-to-end: `waitlist` table (client + optional service

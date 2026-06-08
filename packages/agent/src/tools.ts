@@ -22,6 +22,8 @@ import {
   listSoapNotes,
   listWaitlist,
   addToWaitlist,
+  listClassSessions,
+  enrollClient,
   bookAppointmentChecked,
   recordExpense,
   type ClientInput,
@@ -252,6 +254,43 @@ const TOOLS: AgentTool[] = [
     preview: (input) => {
       const i = input as { clientId: string; preferredWindow: string | null };
       return `Add client #${i.clientId} to the waitlist${i.preferredWindow ? ` (${i.preferredWindow})` : ""}.`;
+    },
+  },
+  {
+    name: "list_classes",
+    description:
+      "List upcoming group classes with their time, capacity, and how many spots are left. Call this when asked about classes, group sessions, or class availability.",
+    permission: "scheduling.view",
+    risk: "auto",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    parse: () => ({}),
+    handler: ({ actor }) => listClassSessions(actor.tenantId, { upcomingOnly: true }),
+    summarize: (r) => {
+      const cs = r as Array<{ name: string; startsAt: string; spotsLeft: number; capacity: number }>;
+      if (cs.length === 0) return "No upcoming classes scheduled.";
+      return `${cs.length} upcoming class(es): ${cs.slice(0, 5).map((c) => `${c.name} ${new Date(c.startsAt).toLocaleString()} (${c.spotsLeft}/${c.capacity} open)`).join("; ")}${cs.length > 5 ? "; …" : ""}.`;
+    },
+  },
+  {
+    name: "enroll_in_class",
+    description:
+      "Enroll a client in a group class. WRITES data and is capacity-checked (a full class is rejected — add to the waitlist instead), so it requires human approval. Needs classId and clientId.",
+    permission: "scheduling.manage",
+    risk: "approval",
+    inputSchema: {
+      type: "object",
+      properties: { classId: { type: "string" }, clientId: { type: "string" } },
+      required: ["classId", "clientId"],
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return { classId: reqStr(i.classId, "classId"), clientId: reqStr(i.clientId, "clientId") };
+    },
+    handler: ({ actor }, input) => enrollClient(actor.tenantId, (input as { classId: string }).classId, (input as { clientId: string }).clientId),
+    preview: (input) => {
+      const i = input as { classId: string; clientId: string };
+      return `Enroll client #${i.clientId} in class #${i.classId}.`;
     },
   },
   {

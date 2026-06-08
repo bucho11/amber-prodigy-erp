@@ -731,6 +731,29 @@ export interface CashFlowStatement {
   /** beginning + netChange === ending AND operating+investing+financing === netChange. */
   reconciled: boolean;
 }
+// ---- Group classes ----
+export interface ClassSession {
+  id: string;
+  name: string;
+  providerId: string | null;
+  providerName: string | null;
+  roomId: string | null;
+  roomName: string | null;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  enrolledCount: number;
+  spotsLeft: number;
+  status: "scheduled" | "cancelled";
+}
+export interface ClassRosterEntry {
+  enrollmentId: string;
+  clientId: string;
+  clientName: string;
+  status: "enrolled" | "cancelled" | "attended" | "no_show";
+  createdAt: string;
+}
+
 // ---- Waitlist ----
 export interface WaitlistEntry {
   id: string;

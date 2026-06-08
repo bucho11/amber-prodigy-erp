@@ -274,6 +274,32 @@ async function applySchema(): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS idx_waitlist_tenant ON waitlist(tenant_id, status, created_at);
 
+    -- Group classes (BL-036): scheduled group sessions with capacity + a roster.
+    CREATE TABLE IF NOT EXISTS class_sessions (
+      id          BIGSERIAL PRIMARY KEY,
+      tenant_id   BIGINT NOT NULL REFERENCES tenants(id),
+      name        TEXT NOT NULL,
+      provider_id BIGINT REFERENCES staff_profiles(id),
+      room_id     BIGINT REFERENCES rooms(id),
+      starts_at   TIMESTAMPTZ NOT NULL,
+      ends_at     TIMESTAMPTZ NOT NULL,
+      capacity    INTEGER NOT NULL DEFAULT 10,
+      status      TEXT NOT NULL DEFAULT 'scheduled',   -- scheduled | cancelled
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_class_sessions_tenant ON class_sessions(tenant_id, starts_at);
+
+    CREATE TABLE IF NOT EXISTS class_enrollments (
+      id               BIGSERIAL PRIMARY KEY,
+      tenant_id        BIGINT NOT NULL REFERENCES tenants(id),
+      class_session_id BIGINT NOT NULL REFERENCES class_sessions(id) ON DELETE CASCADE,
+      client_id        BIGINT NOT NULL REFERENCES clients(id),
+      status           TEXT NOT NULL DEFAULT 'enrolled',   -- enrolled | cancelled | attended | no_show
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (class_session_id, client_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_class_enrollments ON class_enrollments(tenant_id, class_session_id);
+
     -- Auto-protocol scheduler (the post-surgical "wedge")
     CREATE TABLE IF NOT EXISTS protocols (
       id          BIGSERIAL PRIMARY KEY,
@@ -847,6 +873,7 @@ export * from "./reports";
 export * from "./payables";
 export * from "./reconciliation";
 export * from "./waitlist";
+export * from "./classes";
 export * from "./memberships";
 export * from "./booking";
 export * from "./audit";

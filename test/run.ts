@@ -53,6 +53,9 @@ async function main(): Promise<void> {
 
     const waitlistSuite = await import("./suites/waitlist.test");
     await waitlistSuite.run(db, t);
+
+    const classesSuite = await import("./suites/classes.test");
+    await classesSuite.run(db, t);
     ok = t.summary();
   } finally {
     if (ephemeral) {

@@ -8,6 +8,7 @@ import { Team } from "./Team";
 import { ClientsAdmin } from "./Clients";
 import { ScheduleAdmin } from "./Schedule";
 import { WaitlistPage } from "./Waitlist";
+import { ClassesPage } from "./Classes";
 import { ProtocolsAdmin } from "./Protocols";
 import { CheckoutPage } from "./Checkout";
 import { BooksPage } from "./Books";
@@ -70,6 +71,7 @@ type Tab =
   | "assistant"
   | "schedule"
   | "waitlist"
+  | "classes"
   | "protocols"
   | "clients"
   | "checkout"
@@ -93,6 +95,7 @@ function Shell() {
     assistant: true,
     schedule: hasPermission("scheduling.view"),
     waitlist: hasPermission("scheduling.view"),
+    classes: hasPermission("scheduling.view"),
     protocols: hasPermission("scheduling.view"),
     clients: hasPermission("clients.view"),
     checkout: hasPermission("pos.operate") || hasPermission("financials.view") || hasPermission("settings.manage"),
@@ -113,6 +116,7 @@ function Shell() {
     { tab: "assistant", label: "Assistant", group: "Front desk" },
     { tab: "schedule", label: "Calendar", group: "Front desk" },
     { tab: "waitlist", label: "Waitlist", group: "Front desk" },
+    { tab: "classes", label: "Classes", group: "Front desk" },
     { tab: "protocols", label: "Protocols", group: "Front desk" },
     { tab: "clients", label: "Clients", group: "Front desk" },
     { tab: "checkout", label: "Checkout", group: "Front desk" },
@@ -166,6 +170,7 @@ function Shell() {
         {effectiveTab === "assistant" && <Assistant />}
         {effectiveTab === "schedule" && <ScheduleAdmin />}
         {effectiveTab === "waitlist" && <WaitlistPage />}
+        {effectiveTab === "classes" && <ClassesPage />}
         {effectiveTab === "protocols" && <ProtocolsAdmin />}
         {effectiveTab === "clients" && <ClientsAdmin />}
         {effectiveTab === "checkout" && <CheckoutPage />}
