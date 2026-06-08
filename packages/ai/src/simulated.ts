@@ -22,7 +22,17 @@ function heuristicPick(text: string, tools: AiToolSpec[]): AiToolCall | null {
     const kws = t.name.toLowerCase().split(/[_\s]+/).filter((w) => w.length >= 3);
     let score = 0;
     for (const w of words) {
-      if (kws.some((k) => w === k || (w.length >= 4 && k.length >= 4 && (w.includes(k) || k.includes(w))))) score++;
+      // Exact token match is a stronger signal than a substring match, so weight it higher —
+      // otherwise "waitlist" fuzzy-matches "list" and ties every list_* tool (first one wins).
+      let matched = 0;
+      for (const k of kws) {
+        if (w === k) {
+          matched = 2;
+          break;
+        }
+        if (w.length >= 4 && k.length >= 4 && (w.includes(k) || k.includes(w))) matched = Math.max(matched, 1);
+      }
+      score += matched;
     }
     if (score > bestScore) {
       bestScore = score;

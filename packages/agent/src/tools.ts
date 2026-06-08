@@ -20,6 +20,8 @@ import {
   createSoapNote,
   getIntake,
   listSoapNotes,
+  listWaitlist,
+  addToWaitlist,
   bookAppointmentChecked,
   recordExpense,
   type ClientInput,
@@ -200,6 +202,56 @@ const TOOLS: AgentTool[] = [
       const notes = r as SoapNoteListItem[];
       if (notes.length === 0) return "No SOAP notes on file for this client.";
       return `${notes.length} chart note(s); most recent ${notes[0].date}${notes[0].providerName ? ` by ${notes[0].providerName}` : ""}.`;
+    },
+  },
+  {
+    name: "list_waitlist",
+    description:
+      "List clients on the waitlist (waiting for an opening) with their preferred service, provider, and timeframe. Call this when a slot opens or when asked who's waiting for an appointment.",
+    permission: "scheduling.view",
+    risk: "auto",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    parse: () => ({}),
+    handler: ({ actor }) => listWaitlist(actor.tenantId, { status: "waiting" }),
+    summarize: (r) => {
+      const w = r as Array<{ clientName: string; serviceName: string | null; preferredWindow: string | null }>;
+      if (w.length === 0) return "The waitlist is empty.";
+      return `${w.length} client(s) waiting: ${w.slice(0, 5).map((e) => `${e.clientName}${e.serviceName ? ` for ${e.serviceName}` : ""}${e.preferredWindow ? ` (${e.preferredWindow})` : ""}`).join("; ")}${w.length > 5 ? "; …" : ""}.`;
+    },
+  },
+  {
+    name: "add_to_waitlist",
+    description:
+      "Add a client to the waitlist for an opening. WRITES data, so it requires human approval. Needs clientId; optional serviceVariantId, providerId, preferredWindow (free text like 'weekday mornings'), and notes.",
+    permission: "scheduling.manage",
+    risk: "approval",
+    inputSchema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string" },
+        serviceVariantId: { type: "string" },
+        providerId: { type: "string" },
+        preferredWindow: { type: "string" },
+        notes: { type: "string" },
+      },
+      required: ["clientId"],
+      additionalProperties: false,
+    },
+    parse: (input) => {
+      const i = (input ?? {}) as Record<string, unknown>;
+      return {
+        clientId: reqStr(i.clientId, "clientId"),
+        serviceVariantId: optStr(i.serviceVariantId),
+        providerId: optStr(i.providerId),
+        preferredWindow: optStr(i.preferredWindow),
+        notes: optStr(i.notes),
+      };
+    },
+    handler: ({ actor }, input) =>
+      addToWaitlist(actor.tenantId, input as { clientId: string; serviceVariantId: string | null; providerId: string | null; preferredWindow: string | null; notes: string | null }),
+    preview: (input) => {
+      const i = input as { clientId: string; preferredWindow: string | null };
+      return `Add client #${i.clientId} to the waitlist${i.preferredWindow ? ` (${i.preferredWindow})` : ""}.`;
     },
   },
   {

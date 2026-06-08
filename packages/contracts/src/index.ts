@@ -731,6 +731,21 @@ export interface CashFlowStatement {
   /** beginning + netChange === ending AND operating+investing+financing === netChange. */
   reconciled: boolean;
 }
+// ---- Waitlist ----
+export interface WaitlistEntry {
+  id: string;
+  clientId: string;
+  clientName: string;
+  serviceVariantId: string | null;
+  serviceName: string | null;
+  providerId: string | null;
+  providerName: string | null;
+  preferredWindow: string | null;
+  notes: string | null;
+  status: "waiting" | "placed" | "cancelled";
+  createdAt: string;
+}
+
 // ---- Bank reconciliation ----
 export interface CashTransaction {
   entryId: string;

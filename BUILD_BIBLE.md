@@ -44,6 +44,7 @@ reality, not priors.
 
 | Date | Metric A (overall) | Metric B (build-ready) | Note |
 |------|--------------------|------------------------|------|
+| 2026-06-07 | **~40%** | **~89%** | **BL-035 — Waitlist (front-of-house, B6) + sharper tool-router.** New `waitlist` domain: table, `waitlist.ts` db (add/list/status, joins client+service+provider names), `routes-waitlist.ts` (scheduling.view/manage), `list_waitlist` + approval-gated `add_to_waitlist` agent tools, a new **Waitlist** nav page (client search picker, add form, placed/remove actions), and `waitlist.test.ts` (6: add/list/status/invalid/unknown-client/agent-gated/tenant-isolation). Also fixed the simulated tool-router to weight EXACT token matches over substring (so "waitlist" stops tying every `list_*` tool). 65/65, audit 20/20, eval 17 pass^1 100%. Research-grounded (GlossGenius/Wellyx: client+service+window fields, fill-cancellations). |
 | 2026-06-07 | **~39%** | **~89%** | **BL-034 — clinical read tools for the agent (surface the chart, don't diagnose).** The agent could WRITE a SOAP note but couldn't READ the chart. Added `get_client_intake` + `list_soap_notes` (clinical.view-gated) that surface RECORDED health history (allergies, conditions, meds, injuries, areas to avoid, consent) — explicitly "recorded info, not medical advice; does not assess contraindications" (constitution Rule 6 made concrete; grounded in 2026 wellness-AI scope research). Test: surfaces recorded allergies/areas-to-avoid, front-desk denied (no clinical.view). 59/59, eval 16 pass^1 100%. Brings the clinical wedge into the Agentic OS, read-side. |
 | 2026-06-07 | **~38%** | **~88%** | **BL-033 — extend the live-audit to the financial UIs (raise the bar on what was built).** The audit covered Books' default + Expenses subtabs only, so the new Balance sheet / Bills / Reconcile UIs (BL-026/028/032) had no a11y coverage. Generalized the harness to capture every Books subtab → **19 screens (up from 14), all 0 axe violations.** Consolidation, not a feature: durable a11y coverage for the back-office surface I just shipped. |
 | 2026-06-07 | **~37%** | **~88%** | **BL-032 — Bank reconciliation (manual clearing).** Web-researched the cleared-vs-outstanding model. Added `cleared_at` to journal entries; `bankReconciliation(asOf)` splits cash transactions into cleared vs outstanding (book = cleared + outstanding; cleared should match the bank statement) and `setEntryCleared` toggles clearing (rejects non-cash entries). `GET /reports/bank-reconciliation`, `POST /journal/:id/cleared`, and a Books "Reconcile" subtab (tick transactions, enter statement balance → shows the difference). Test: book ties to the Balance Sheet cash, clearing updates the cleared balance, non-cash entries rejected. 58/58. |
@@ -154,8 +155,8 @@ reality, not priors.
   (bill-pay ACH rails-gated), ~~bank reconciliation~~ ✅ BL-032 (manual clearing; bank-feed rail later),
   ~~financial statements~~ ✅ **big-3 done** (Balance Sheet BL-026, P&L BL-027, Cash Flow BL-031), period
   close, cash-basis reporting toggle, payroll **calc** → paystubs → checks → 1099/W-2 prep (rails-gated).
-- **B6 — Front-of-house polish:** deposits (Stripe-gated), waitlist, classes, website/branded app,
-  reviews/reputation, resources.
+- **B6 — Front-of-house polish:** deposits (Stripe-gated), ~~waitlist~~ ✅ BL-035 (auto-notify needs
+  comms rail), classes, website/branded app, reviews/reputation, resources.
 - **B7 — AI CORE / Agentic OS** *(the differentiator; epic — starts right after the gate)*:
   (a) **provider seam** — `AiProvider` interface + deterministic `SimulatedAiProvider` (no key) +
   `ClaudeAiProvider` (Anthropic, latest models) behind one factory; (b) **agent runtime** — an
@@ -176,6 +177,31 @@ reality, not priors.
 
 ### 0.5 BUILD LOG (newest first)
 <!-- New increments prepend a BL-NNN entry here. Format: WHAT / WHY-HOW / BOUNDARY / GATES. -->
+
+### BL-035 (2026-06-07) — Waitlist [front-of-house breadth, B6] + exact-match tool-router fix
+WHAT: New front-of-house `waitlist` domain end-to-end: `waitlist` table (client + optional service
+variant / provider / preferred-window / notes / status), `packages/db/src/waitlist.ts`
+(`addToWaitlist`/`listWaitlist`/`setWaitlistStatus`/`getWaitlistEntry`, resolving client/service/provider
+names), `WaitlistEntry` contract, `routes-waitlist.ts` (GET/POST/status; `scheduling.view` read /
+`scheduling.manage` write), `list_waitlist` (read) + approval-gated `add_to_waitlist` (write, with
+preview) agent tools, and a new **Waitlist** nav page (debounced client search picker → add form;
+list with Placed/Remove actions). New `waitlist.test.ts` (6 tests: add+list, status transitions, invalid
+status, unknown client, agent approval-gate, tenant isolation). Added Waitlist to the live-audit
+(20 screens, 0 axe). ALSO fixed `simulated.ts` `heuristicPick`: exact token matches now weight 2 vs.
+1 for substring, so "waitlist" no longer fuzzy-ties every `list_*` tool (was routing to list_accounts).
+WHY/HOW: User said continue + research. Researched salon/spa/massage waitlist practice (GlossGenius,
+Wellyx, Zenoti): capture client + treatment + preferred days/times + provider + notes, and fill
+cancellations from matching entries (recovers ~60–70% of last-minute cancels). Built the track-and-surface
+core; reused the scheduling permission gates and the approval/preview infra. The router fix is a genuine
+improvement to the deterministic eval stand-in (exact match is a stronger signal than substring) and
+regression-checked against all 65 tests + 17 eval scenarios.
+BOUNDARY: Auto-notify on a matching cancellation needs a comms rail (SMS/email — B-RAILS), so today it's
+manual: staff see the list and reach out, then mark Placed. No automated service/provider/time MATCHING
+of a freed slot to entries yet (entries store the preferences; surfacing the best match for a specific
+opening is the follow-up). No VIP/priority ordering (FIFO by created_at). The add form collects
+client + window + notes; service/provider are nullable and not yet pickable in the UI (agent/API accept
+them). Per-role audit still owner-only.
+GATES: typecheck PASS, build PASS, test 65/65 PASS, audit 20/20 screens 0 axe, eval 17 runnable pass^1 100%.
 
 ### BL-034 (2026-06-07) — Clinical read tools for the agent [the wellness wedge, into the Agentic OS]
 WHAT: Added two `clinical.view`-gated agent READ tools: `get_client_intake` (reason for visit,

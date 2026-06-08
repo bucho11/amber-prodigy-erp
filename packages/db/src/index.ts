@@ -260,6 +260,20 @@ async function applySchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_appointments_room ON appointments(tenant_id, room_id, starts_at);
     CREATE INDEX IF NOT EXISTS idx_appointments_client ON appointments(tenant_id, client_id);
 
+    -- Waitlist (BL-035): clients waiting for a slot; surfaced when a matching opening appears.
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id                 BIGSERIAL PRIMARY KEY,
+      tenant_id          BIGINT NOT NULL REFERENCES tenants(id),
+      client_id          BIGINT NOT NULL REFERENCES clients(id),
+      service_variant_id BIGINT REFERENCES service_variants(id),
+      provider_id        BIGINT REFERENCES staff_profiles(id),
+      preferred_window   TEXT,
+      notes              TEXT,
+      status             TEXT NOT NULL DEFAULT 'waiting',   -- waiting | placed | cancelled
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_waitlist_tenant ON waitlist(tenant_id, status, created_at);
+
     -- Auto-protocol scheduler (the post-surgical "wedge")
     CREATE TABLE IF NOT EXISTS protocols (
       id          BIGSERIAL PRIMARY KEY,
@@ -832,6 +846,7 @@ export * from "./inventory";
 export * from "./reports";
 export * from "./payables";
 export * from "./reconciliation";
+export * from "./waitlist";
 export * from "./memberships";
 export * from "./booking";
 export * from "./audit";

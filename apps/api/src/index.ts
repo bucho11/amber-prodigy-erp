@@ -36,6 +36,7 @@ import { registerInventoryRoutes } from "./routes-inventory";
 import { registerReportRoutes } from "./routes-reports";
 import { registerMembershipRoutes } from "./routes-memberships";
 import { registerPayableRoutes } from "./routes-payables";
+import { registerWaitlistRoutes } from "./routes-waitlist";
 import { registerPublicRoutes } from "./routes-public";
 import { registerAuditRoutes } from "./routes-audit";
 import { registerAiRoutes } from "./routes-ai";
@@ -127,6 +128,9 @@ registerMembershipRoutes(api);
 
 // Accounts-payable routes (vendors + bills).
 registerPayableRoutes(api);
+
+// Waitlist routes.
+registerWaitlistRoutes(api);
 
 // Public (unauthenticated) online-booking routes.
 registerPublicRoutes(api);

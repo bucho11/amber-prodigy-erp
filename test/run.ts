@@ -50,6 +50,9 @@ async function main(): Promise<void> {
 
     const payablesSuite = await import("./suites/payables.test");
     await payablesSuite.run(db, t);
+
+    const waitlistSuite = await import("./suites/waitlist.test");
+    await waitlistSuite.run(db, t);
     ok = t.summary();
   } finally {
     if (ephemeral) {
